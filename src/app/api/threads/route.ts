@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClineAdapter } from "@/lib/cline/adapter";
+import { listThreadsFromDisk } from "@/lib/cline/session-reader";
 
 /**
  * GET /api/threads
  *
  * Returns a JSON list of Cline sessions mapped to the UI thread shape.
- * The adapter reads from ~/.cline/data/ and maps each session to
- * { id, title, createdAt, updatedAt, status, source }.
+ * Reads directly from ~/.cline/data/sessions/ filesystem — no full
+ * ClineCore runtime needed for this read-only endpoint.
  */
 export async function GET() {
   try {
-    const adapter = await createClineAdapter();
-    const threads = await adapter.listHistory();
-
+    const threads = await listThreadsFromDisk();
     return NextResponse.json(threads);
   } catch (error) {
     const message =
