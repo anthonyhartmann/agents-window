@@ -5,6 +5,12 @@ const nextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  serverExternalPackages: [
+    "@cline/sdk",
+    "@cline/core",
+    "@cline/llms",
+    "@cline/shared",
+  ],
 };
 
 export default nextConfig;

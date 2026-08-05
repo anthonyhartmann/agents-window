@@ -117,6 +117,8 @@ export interface StartSessionInput {
   source?: string;
   /** Base64-encoded user images. */
   userImages?: string[];
+  /** Existing thread ID to resume. */
+  threadId?: string;
 }
 
 // ---------------------------------------------------------------------------
