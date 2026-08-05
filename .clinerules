@@ -1,0 +1,120 @@
+# GLOBAL DIRECTIVE
+# Be concise. Use brief sentences. Avoid preamble, fluff, and summarizing what you're about to do.
+# Get to the point immediately. This applies to all agents and tasks in this workspace.
+
+# .clinerules — agents-window (Next.js + Cline SDK Chat UI)
+# ============================================================================
+# This is a FORK of the LangChain Agent Chat UI with the backend rewired
+# from LangGraph to the local Cline SDK. It is a Next.js 15 App Router app.
+# The Cline SDK is NOT on npm. Shared session state lives in ~/.cline/data/.
+# ============================================================================
+
+## 1. PROJECT CONTEXT & FORK SAFETY
+
+- **This is a fork**: agent-chat-ui code assumes LangGraph. We REMOVED:
+  - `@langchain/langgraph-sdk`, `@langchain/core`, `@langchain/langgraph`
+  - `langgraph-nextjs-api-passthrough`
+- **Do NOT re-install LangGraph packages** unless explicitly instructed.
+- **Do NOT delete UI shell components** (chat bubbles, tool-call renderers, artifact panel,
+  sidebar thread list) unless replacing them. The goal is to rewire the DATA layer, not rebuild the UI.
+- **Preserve shadcn/ui components** in `components/ui/`. If a component is missing, use `npx shadcn add <component>`.
+- **Preserve Tailwind v4 config** (`globals.css`, `tailwind.config.ts` if present). Do not downgrade to v3.
+
+## 2. CLINE SDK RULES (CRITICAL)
+
+- **`@cline/sdk` is a LOCAL `file:` dependency**. It is NOT published to npm.
+  - The `package.json` references it via `file:~/.asdf/installs/nodejs/22.22.1/lib/node_modules/cline/node_modules/@cline/sdk`
+  - **NEVER** run `npm install @cline/sdk`, `npm install @cline/core`, or add them to a registry.
+  - If the path breaks, ask before changing it. Do not guess a new path.
+- **Treat `ClineCore` as semi-private**: `host`, `subscribe`, and some event shapes are internal.
+  - **Always use the adapter module** (`lib/cline/adapter.ts` or similar) to interact with the SDK.
+  - If the SDK API changes, only the adapter file changes.
+  - Never import `ClineCore` directly into API routes or React components — go through the adapter.
+- **Session persistence is SHARED** with Cline CLI and VS Code extension.
+  - Data lives in `~/.cline/data/sessions/` and `~/.cline/data/db/sessions.db`.
+  - **Do NOT write raw SQL** against `sessions.db` unless using an existing Cline store class.
+  - **Do NOT delete, move, or corrupt files in `~/.cline/data/`**. Treat it as a production database.
+
+## 3. NEXT.JS 15 & REACT 19 RULES
+
+- **App Router only**. No `pages/`. API routes live in `app/api/`.
+- **Server Components by default**. Only mark `'use client'` when:
+  - Using React hooks (`useState`, `useEffect`)
+  - Using browser APIs (`localStorage`, `window`)
+  - Using event handlers (`onClick`)
+- **React 19 compatibility**:
+  - Do not use legacy patterns (class components, `forwardRef` where `ref` prop works).
+  - `use` and `cache` are available — prefer them over manual suspense wrappers where appropriate.
+- **API Route handlers**: export `async function GET|POST|PATCH|DELETE(request: Request)`.
+  - For SSE (`/api/chat/stream`), return a `Response` with `ReadableStream` and correct headers:
+    `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`.
+  - **Flush events immediately**: do not buffer SSE chunks. Use `controller.enqueue()` promptly.
+- **Body size limits**: if handling file uploads, increase the route segment config:
+  `export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };`
+
+## 4. SSE STREAM LIFECYCLE (HARD RULES)
+
+- **Close the stream on terminal events only**: `ended`, `done`, or irrecoverable adapter error.
+- **Do NOT close on every tool call finish** — Cline may continue with more reasoning.
+- **Handle client disconnects**: if `request.signal` aborts, clean up the Cline subscription to avoid memory leaks.
+- **Background work**: if Cline continues after stream close, that is acceptable for Phase 1.
+  Do not invent polling or background-fetch mechanisms unless asked.
+
+## 5. EVENT & MESSAGE MAPPING
+
+- **Cline events MUST be mapped to LangGraph-compatible message shapes**.
+  - `tool_calls` arrays must match the shape expected by existing UI renderers.
+  - `content` fields must be strings (or the known array shape), not raw SDK buffers.
+- **Mapping files are the contract**: `lib/cline/map-events.ts` and `lib/cline/map-messages.ts`
+  - When adding a new Cline event type, update the mapper AND add a unit test.
+  - If a Cline event has no UI equivalent, map it to a no-op or system message — do not crash.
+- **Tool call rendering**: the UI already knows how to render `tool_calls`. Our job is to ensure
+  the mapper produces `tool_calls` with `id`, `name`, and `args` (or `arguments`) fields.
+
+
+## 6. TYPE SAFETY & BUILD GATES
+
+- **`pnpm typecheck` (or `tsc --noEmit`) is the mandatory gate**. It must pass before `pnpm dev` or `pnpm build`.
+  - Next.js dev swallows type errors. Do not trust `pnpm dev` alone.
+- **Strict mode**: `strict: true`, `noImplicitAny`, `forceConsistentCasingInFileNames`.
+- **No `any` in new code**. If types are unknown from the SDK, define an interface in the adapter
+  and cast narrowly. `any` in the adapter poisons the whole app.
+
+## 7. STATE & DATA FLOW
+
+- **Thread ID lives in URL query state** via `nuqs`. Do not lift it into a global store unnecessarily.
+- **Thread list reads from the adapter**, not directly from `~/.cline/data/`.
+- **Optimistic UI is fine**, but revert on actual error. Do not leave stale optimistic state.
+- **No localStorage for session data** — the source of truth is the Cline session store.
+
+## 8. TEST & RUN WORKFLOW
+
+For a typical task, Cline should:
+1. Read the relevant existing file(s) before editing. Do not assume the shape of forked code.
+2. Plan the change in a scratch comment or brief note.
+3. Edit TypeScript source only.
+4. Run `pnpm typecheck` to verify type safety.
+5. Run `pnpm dev` and verify the page loads without runtime errors.
+6. If the change affects SSE or API routes, test with `curl` or browser Network tab.
+7. If the change affects message mapping, verify tool calls render correctly in the UI.
+
+## 9. EDITING & TOOL SAFETY (ESPECIALLY FOR DUMBER MODELS)
+
+- **Read before replacing**: Always read the full file (or at least the function/region) before editing.
+  - Blind string replacement in React components or SSE handlers is a common source of breakage.
+- **One concern per edit**: Do not refactor unrelated code while implementing a feature.
+- **Preserve imports**: When replacing code, ensure all used imports remain. Do not leave dead imports,
+  and do not drop imports that are still needed.
+- **Do not hand-edit `node_modules/` or `.next/`**: These are generated. Changes will be lost.
+- **Do not commit `pnpm-lock.yaml` changes unless you actually ran `pnpm install`**: Stale lockfiles break CI.
+- **Replacement-string hazard**: strings containing `$'` can trigger `$`-pattern substitution in some tools.
+  Prefer insert/replace with verified context rather than broad regex when `$'` is present.
+
+## 10. DEBUGGING & INCIDENT PREVENTION
+
+- **Check the browser console first** for React hydration mismatches — common in App Router + streaming.
+- **Check Network tab for SSE** — look for `event:` lines and correct `data:` JSON.
+- **If the SDK throws**: wrap the call site in a try/catch, log the error, and return a 500 with a plain
+  message. Do not let unhandled exceptions crash the Next.js dev server.
+- **If thread list is empty**: verify the adapter is reading from the correct Cline data path.
+- **If tool calls don't render**: verify the mapper produces `tool_calls` as an array of objects with `id` and `function.name`.

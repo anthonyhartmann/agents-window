@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Adapt Agent Chat UI for Cline</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #333; background: #fafafa; }
+  h1 { color: #111; border-bottom: 2px solid #e5e5e5; padding-bottom: 10px; }
+  h2 { color: #222; margin-top: 40px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+  h3 { color: #333; margin-top: 30px; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+  th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+  th { background: #f0f0f0; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote { border-left: 4px solid #ddd; margin: 0; padding-left: 16px; color: #555; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  hr { border: none; border-top: 1px solid #eee; margin: 30px 0; }
+  .highlight { background: #fff3cd; padding: 2px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>Plan: Adapt Agent Chat UI for Cline</h1>
+<h2>Goal</h2>
+<p>Replace your custom agent/window interface with the polished <strong>LangChain Agent Chat UI</strong>, wired directly to <strong>Cline</strong> as the backend agent engine. The result is a Next.js web app that looks like agent-chat-ui but talks to Cline's SDK instead of LangGraph.</p>
+<hr />
+<h2>What We Learned</h2>
+<h3>Agent Chat UI Architecture</h3>
+<ul>
+<li><strong>Next.js 15</strong> app using React 19, Tailwind, shadcn/ui</li>
+<li>Streams messages via <code>@langchain/langgraph-sdk/react</code> <code>useStream</code></li>
+<li>Expects a LangGraph-compatible HTTP API with <code>/threads</code>, <code>/runs</code> endpoints</li>
+<li>Renders human messages, AI messages, tool calls, generic interrupts, and artifacts</li>
+<li>Has a setup form for Deployment URL, Assistant ID, and API key</li>
+</ul>
+<h3>Cline SDK Architecture (locally available)</h3>
+<ul>
+<li><code>@cline/sdk</code> v0.0.65 is bundled inside your globally installed <code>cline</code> package at:
+<code>~/.asdf/installs/nodejs/22.22.1/lib/node_modules/cline/node_modules/@cline/...</code></li>
+<li><strong>Key classes:</strong> <code>ClineCore</code> (session host), <code>Agent</code> (stateless loop)</li>
+<li><strong>Session API:</strong><ul>
+<li><code>ClineCore.create({ clientName: &quot;...&quot; })</code> → initializes runtime</li>
+<li><code>cline.start({ config: { provider, model, workspaceRoot }, prompt })</code> → starts session</li>
+<li><code>cline.send(sessionId, { prompt, userImages, userFiles })</code> → sends follow-up</li>
+<li><code>runtimeHost.subscribe((event: CoreSessionEvent) =&gt; ...)</code> → streams events</li>
+</ul>
+</li>
+<li><strong>Events:</strong> <code>chunk</code> (stdout/stderr/agent), <code>agent_event</code> (<code>content_start</code>, <code>content_update</code>, <code>content_end</code>, <code>iteration_start</code>, <code>iteration_end</code>, <code>usage</code>, <code>done</code>, <code>error</code>), <code>ended</code>, <code>hook</code>, <code>status</code></li>
+<li><strong>Persistence:</strong> Sessions saved to <code>~/.cline/data/db/sessions.db</code> and <code>~/.cline/data/sessions/&lt;id&gt;/</code></li>
+<li><strong>Tool calls:</strong> Built-in tools (bash, editor, read_files, search, fetch_web) + MCP servers</li>
+</ul>
+<hr />
+<h2>Proposed Architecture</h2>
+<pre><code>Browser (localhost:3000)
+  Thread List    Chat Thread     Artifact / Code
+  (sidebar)      (main)          (right panel)
+        |              |                |
+        +--------------+----------------+
+                       | SSE / HTTP
+        +--------------v----------------+
+        |   Next.js API Routes          |
+        |   /api/chat/stream            |
+        |   /api/threads                |
+        |   /api/threads/[id]           |
+        |          |                    |
+        |   +------v----------------+   |
+        |   |   Cline SDK           |   |
+        |   |   start/send/subscribe|   |
+        |   +------^----------------+   |
+        |          |                    |
+        |   sessions.db  LLM APIs  MCP  |
+        |   ~/.cline/    (Anthropic,    |
+        |              OpenAI, etc.)    |
+        +-------------------------------+
+</code></pre>
+<hr />
+<h2>Implementation Phases</h2>
+<h3>Phase 1: Project Bootstrap (1-2 hours)</h3>
+<ol>
+<li><strong>Clone</strong> <code>github.com/langchain-ai/agent-chat-ui</code> into a new directory (e.g., <code>~/Projects/cline-chat-ui</code> or <code>~/.cline/cline-chat-ui</code>)</li>
+<li><strong>Switch Node version</strong> to 22.22.1 (where <code>cline</code> and <code>@cline/sdk</code> are installed) or copy the <code>@cline/*</code> scoped packages into the project</li>
+<li><strong>Install dependencies:</strong> <code>pnpm install</code></li>
+<li><strong>Add local SDK dependency:</strong> link or copy <code>@cline/sdk</code>, <code>@cline/core</code>, <code>@cline/shared</code>, <code>@cline/agents</code>, <code>@cline/llms</code> from the global cline package into the project's <code>node_modules</code> or package.json</li>
+<li><strong>Verify build:</strong> <code>pnpm dev</code> should still start the vanilla agent-chat-ui</li>
+</ol>
+<h3>Phase 2: Backend API Routes (2-3 hours)</h3>
+<ol>
+<li><strong>Remove</strong> the LangGraph API proxy route (<code>src/app/api/[..._path]/route.ts</code>)</li>
+<li><strong>Create</strong> <code>/api/chat/stream/route.ts</code> — Server-Sent Events (SSE) endpoint:<ul>
+<li><code>POST</code> request body: <code>{ threadId?: string, messages: Array&lt;{ role: &quot;user&quot; | &quot;assistant&quot;, content: string }&gt; }</code></li>
+<li>If <code>threadId</code> missing → <code>const result = await clineCore.start({ config: { provider, model, workspaceRoot, enableTools: true }, prompt: lastUserMessage })</code></li>
+<li>If <code>threadId</code> present → <code>await clineCore.send(threadId, { prompt: lastUserMessage })</code></li>
+<li>Subscribe to events: <code>runtimeHost.subscribe((event) =&gt; { write SSE data })</code></li>
+<li>Map events to a simple JSON stream protocol the frontend understands:<ul>
+<li><code>{ type: &quot;text_delta&quot;, text: &quot;...&quot; }</code></li>
+<li><code>{ type: &quot;tool_call&quot;, name: &quot;...&quot;, input: {...} }</code></li>
+<li><code>{ type: &quot;tool_result&quot;, name: &quot;...&quot;, output: {...}, error?: &quot;...&quot; }</code></li>
+<li><code>{ type: &quot;usage&quot;, inputTokens: N, outputTokens: N }</code></li>
+<li><code>{ type: &quot;done&quot; }</code></li>
+<li><code>{ type: &quot;error&quot;, message: &quot;...&quot; }</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Create</strong> <code>/api/threads/route.ts</code> — GET list of threads:<ul>
+<li>Query Cline's <code>SqliteSessionStore</code> or read <code>~/.cline/data/db/sessions.db</code></li>
+<li>Return threads in format: <code>{ threads: [{ thread_id, created_at, updated_at, metadata: { name } }] }</code></li>
+</ul>
+</li>
+<li><strong>Create</strong> <code>/api/threads/[id]/route.ts</code> — GET thread messages:<ul>
+<li>Read <code>~/.cline/data/sessions/&lt;id&gt;/&lt;id&gt;.messages.json</code></li>
+<li>Parse and map to frontend message format</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Custom Stream Provider (2-3 hours)</h3>
+<ol>
+<li><strong>Replace</strong> <code>src/providers/Stream.tsx</code>:<ul>
+<li>Remove imports from <code>@langchain/langgraph-sdk/react</code></li>
+<li>Remove the setup form (LangGraph URL, assistant ID, API key)</li>
+<li>Create <code>useClineStream()</code> hook with interface matching agent-chat-ui's expectations:<ul>
+<li><code>messages: Message[]</code></li>
+<li><code>isLoading: boolean</code></li>
+<li><code>submit({ messages }, options)</code> — opens SSE to <code>/api/chat/stream</code>, appends user message optimistically, processes streamed events into AI message</li>
+<li><code>stop()</code> — aborts the SSE connection</li>
+<li><code>getMessagesMetadata(message)</code> — returns branch info (simplified)</li>
+</ul>
+</li>
+<li>Keep <code>threadId</code> in query state (<code>nuqs</code>)</li>
+</ul>
+</li>
+<li><strong>Handle SSE parsing</strong> in the hook:<ul>
+<li><code>EventSource</code> or <code>fetch</code> + <code>ReadableStream</code> reader</li>
+<li>Parse each JSON line and mutate local message state</li>
+<li>Append text deltas to the current AI message</li>
+<li>Inject tool call / tool result messages when events arrive</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 4: Message Format Adapter (1-2 hours)</h3>
+<ol>
+<li><strong>Define</strong> shared types in <code>src/lib/cline-types.ts</code>:<ul>
+<li><code>ClineStreamEvent = TextDeltaEvent | ToolCallEvent | ToolResultEvent | UsageEvent | DoneEvent | ErrorEvent</code></li>
+<li><code>ClineMessage = { id: string, type: &quot;human&quot; | &quot;ai&quot; | &quot;tool&quot;, content: string | ContentBlock[], tool_calls?: ToolCall[], ... }</code></li>
+</ul>
+</li>
+<li><strong>Map</strong> Cline <code>AgentEvent</code>s to UI messages:<ul>
+<li><code>agent_event</code> → <code>content_start</code> / <code>content_update</code> / <code>content_end</code>:<ul>
+<li><code>contentType: &quot;text&quot;</code> → append to AI message text</li>
+<li><code>contentType: &quot;tool&quot;</code> with <code>toolName</code> / <code>input</code> → create <code>ToolCalls</code> message</li>
+<li><code>contentType: &quot;tool&quot;</code> with <code>output</code> / <code>error</code> → create <code>ToolResult</code> message</li>
+</ul>
+</li>
+<li><code>chunk</code> with <code>stream: &quot;agent&quot;</code> → treat as text output</li>
+<li><code>done</code> / <code>ended</code> → finalize streaming state</li>
+</ul>
+</li>
+<li><strong>Adapt</strong> <code>src/components/thread/messages/ai.tsx</code> and <code>human.tsx</code>:<ul>
+<li>Keep rendering logic mostly intact</li>
+<li>Update type imports to use local <code>ClineMessage</code> instead of <code>@langchain/langgraph-sdk/Message</code></li>
+<li><code>ToolCalls</code> and <code>ToolResult</code> components likely need minimal changes</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 5: Thread History &amp; Persistence (1-2 hours)</h3>
+<ol>
+<li><strong>Update</strong> <code>src/providers/Thread.tsx</code>:<ul>
+<li>Remove LangGraph client creation</li>
+<li>Implement <code>getThreads()</code> by calling <code>/api/threads</code></li>
+<li>Format dates and metadata from Cline session records</li>
+</ul>
+</li>
+<li><strong>Add</strong> auto-refresh when new messages arrive:<ul>
+<li>After <code>submit()</code> completes, refetch thread list (same pattern as original)</li>
+</ul>
+</li>
+<li><strong>Handle</strong> empty states and loading skeletons</li>
+</ol>
+<h3>Phase 6: UI Polish &amp; Config (1-2 hours)</h3>
+<ol>
+<li><strong>Simplify the top bar:</strong><ul>
+<li>Remove LangGraph logo</li>
+<li>Add Cline branding or keep it neutral</li>
+<li>Show current model/provider (read from Cline settings)</li>
+</ul>
+</li>
+<li><strong>Add provider/model selector (optional):</strong><ul>
+<li>Dropdown to switch between Cline-configured providers</li>
+<li>Read available providers from <code>~/.cline/data/settings/providers.json</code></li>
+</ul>
+</li>
+<li><strong>Keep existing features:</strong><ul>
+<li>File upload (images, PDFs) → pass through to Cline via <code>userImages</code> / <code>userFiles</code></li>
+<li>&quot;Hide Tool Calls&quot; toggle</li>
+<li>Scroll-to-bottom behavior (<code>use-stick-to-bottom</code>)</li>
+<li>Artifact panel for generated files</li>
+</ul>
+</li>
+<li><strong>Theme/dark mode:</strong> already works via <code>next-themes</code></li>
+</ol>
+<h3>Phase 7: Testing &amp; Validation (1 hour)</h3>
+<ol>
+<li>Start the dev server: <code>pnpm dev</code></li>
+<li>Send a test message → verify Cline session starts in <code>~/.cline/data/sessions/</code></li>
+<li>Verify streaming text appears in real-time</li>
+<li>Verify tool calls render correctly</li>
+<li>Verify thread history loads on refresh</li>
+<li>Check that existing Cline CLI sessions are not corrupted</li>
+</ol>
+<hr />
+<h2>Key Files to Modify / Create</h2>
+<p>| File | Action | Description |
+|------|--------|-------------|
+| <code>package.json</code> | Modify | Add <code>@cline/sdk</code> dependency (local path or copy) |
+| <code>src/providers/Stream.tsx</code> | Replace | Custom Cline stream provider, no LangGraph |
+| <code>src/providers/Thread.tsx</code> | Replace | Read threads from Cline SQLite |
+| <code>src/app/api/chat/stream/route.ts</code> | Create | SSE endpoint wrapping Cline SDK |
+| <code>src/app/api/threads/route.ts</code> | Create | List threads from Cline DB |
+| <code>src/app/api/threads/[id]/route.ts</code> | Create | Get thread messages from Cline session files |
+| <code>src/app/api/[..._path]/route.ts</code> | Delete | Remove LangGraph proxy |
+| <code>src/hooks/use-cline-stream.ts</code> | Create | Custom hook replacing <code>useStream</code> |
+| <code>src/lib/cline-types.ts</code> | Create | Shared types and event mapping |
+| <code>src/lib/cline-client.ts</code> | Create | Singleton ClineCore initializer |
+| <code>src/components/thread/messages/ai.tsx</code> | Adapt | Type changes only (mostly) |
+| <code>src/components/thread/messages/human.tsx</code> | Adapt | Type changes only (mostly) |
+| <code>src/components/thread/index.tsx</code> | Minor | Update imports, remove LangGraph-specifics |</p>
+<hr />
+<h2>Risks &amp; Mitigations</h2>
+<p>| Risk | Mitigation |
+|------|------------|
+| <code>@cline/sdk</code> is not on npm | Use the bundled copy inside the global <code>cline</code> package (Node 22.22.1) |
+| Cline SDK requires Node ≥22 | Ensure the project runs on Node 22.22.1 or install SDK under the active Node version |
+| Cline hub daemon port conflict (25463) | The SDK will auto-connect to the existing hub; our API routes run in the same machine |
+| Session format changes in future Cline versions | Pin to current SDK version; adapter layer isolates changes |
+| SSE streaming complexity | Start with simple <code>fetch</code> + <code>ReadableStream</code>; upgrade to <code>EventSource</code> if needed |
+| Tool call rendering mismatch | Map Cline events to LangGraph-style <code>tool_calls</code> / <code>tool</code> messages for reuse of existing UI |</p>
+<hr />
+<h2>One Decision Needed From You</h2>
+<h3>Should the chat UI share sessions with your existing Cline CLI / VS Code usage?</h3>
+<p><strong>Option A: Shared Sessions (Recommended)</strong></p>
+<ul>
+<li><code>ClineCore.create({ clientName: &quot;cline-chat-ui&quot; })</code> uses the default <code>~/.cline/data/</code> directory</li>
+<li>Threads you start in the web UI show up in Cline CLI / VS Code</li>
+<li>Existing Cline sessions appear in the web UI thread list</li>
+<li><strong>Tradeoff:</strong> The UI must handle session types it didn't create (e.g., coding tasks with file edits)</li>
+</ul>
+<p><strong>Option B: Isolated Sessions</strong></p>
+<ul>
+<li>Configure <code>ClineCore.create({ clientName: &quot;cline-chat-ui&quot;, dataDir: &quot;~/.cline-chat-ui/data&quot; })</code> (if supported) or maintain a separate thread list</li>
+<li>Web UI only shows its own conversations</li>
+<li><strong>Tradeoff:</strong> No cross-client history; simpler mapping</li>
+</ul>
+<p><strong>Option C: Read-only shared history, isolated new chats</strong></p>
+<ul>
+<li>List all Cline sessions in sidebar, but only open new chat sessions through the web UI</li>
+<li><strong>Tradeoff:</strong> Best of both worlds, but opening existing coding sessions in a chat UI may be weird</li>
+</ul>
+<p>Please let me know which option you prefer, or if you want to start with <strong>Option A</strong> and iterate.</p>
+<hr />
+<h2>Next Steps (After Your Approval)</h2>
+<ol>
+<li>Switch to <strong>Act mode</strong> and clone the repo</li>
+<li>Set up the project with local <code>@cline/sdk</code> dependency</li>
+<li>Implement Phase 2 (backend API routes) first, since it can be tested independently with <code>curl</code></li>
+<li>Then wire up the frontend stream provider</li>
+<li>Iterate on message rendering and thread history</li>
+</ol>
+
+</body>
+</html>
