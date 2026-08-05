@@ -130,3 +130,23 @@ export interface SendPromptInput {
   prompt: string;
   userImages?: string[];
 }
+
+// ---------------------------------------------------------------------------
+// UI message factories
+// ---------------------------------------------------------------------------
+
+export function humanMessage(content: string, id?: string): UIMessage {
+  return { type: "human", content, ...(id && { id }) };
+}
+
+export function aiMessage(content: string, opts?: { id?: string; tool_calls?: UIMessage["tool_calls"] }): UIMessage {
+  return { type: "ai", content, ...(opts?.id && { id: opts.id }), ...(opts?.tool_calls && { tool_calls: opts.tool_calls }) };
+}
+
+export function toolMessage(toolCallId: string, name: string, content: string, status: "success" | "error" = "success"): UIMessage {
+  return { type: "tool", content, tool_call_id: toolCallId, name, status };
+}
+
+export function toolCallEntry(id: string, name: string, args: Record<string, unknown> = {}) {
+  return { id, name, args, type: "tool_call" as const };
+}

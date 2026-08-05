@@ -18,6 +18,27 @@ async function getAdapter() {
   return adapterSingleton;
 }
 
+function serializeAgentEvent(
+  event: Extract<CoreSessionEvent, { type: "agent_event" }>["payload"]["event"],
+  sessionId: string,
+): Record<string, unknown> {
+  const base = { type: event.type, sessionId };
+
+  if (event.type === "content_start") {
+    return { ...base, contentType: event.contentType, toolName: event.toolName, toolCallId: event.toolCallId };
+  }
+  if (event.type === "content_update") {
+    return { ...base, contentType: event.contentType, toolName: event.toolName, toolCallId: event.toolCallId, update: event.update };
+  }
+  if (event.type === "content_end") {
+    return { ...base, contentType: event.contentType, text: event.text, reasoning: event.reasoning, toolName: event.toolName, toolCallId: event.toolCallId, output: event.output, error: event.error };
+  }
+  if (event.type === "error") {
+    return { ...base, error: event.error instanceof Error ? event.error.message : String(event.error) };
+  }
+  return base;
+}
+
 export async function POST(request: Request) {
   let body: { message?: string; threadId?: string };
   try {
@@ -35,110 +56,53 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: unknown) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
-        );
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
       let unsub: (() => void) | undefined;
 
       try {
         const adapter = await getAdapter();
-
-        // Start or resume session
         const { sessionId } = await adapter.startSession({
           prompt: body.message,
           source: "web",
           ...(body.threadId && { threadId: body.threadId }),
         });
 
-        // Send session ID immediately
         send("session", { sessionId });
 
-        // Subscribe to events
         unsub = adapter.subscribe((event: CoreSessionEvent) => {
           switch (event.type) {
-            case "agent_event": {
-              const e = event.payload.event;
-              send("agent_event", {
-                type: e.type,
-                sessionId: event.payload.sessionId,
-                ...(e.type === "content_start" && {
-                  contentType: e.contentType,
-                  toolName: e.toolName,
-                  toolCallId: e.toolCallId,
-                }),
-                ...(e.type === "content_update" && {
-                  contentType: e.contentType,
-                  toolName: e.toolName,
-                  toolCallId: e.toolCallId,
-                  update: e.update,
-                }),
-                ...(e.type === "content_end" && {
-                  contentType: e.contentType,
-                  text: e.text,
-                  reasoning: e.reasoning,
-                  toolName: e.toolName,
-                  toolCallId: e.toolCallId,
-                  output: e.output,
-                  error: e.error,
-                }),
-                ...(e.type === "error" && {
-                  error: e.error instanceof Error ? e.error.message : String(e.error),
-                }),
-                ...(e.type === "done" && {}),
-              });
+            case "agent_event":
+              send("agent_event", serializeAgentEvent(event.payload.event, event.payload.sessionId));
               break;
-            }
             case "ended":
-              send("ended", {
-                sessionId: event.payload.sessionId,
-                reason: event.payload.reason,
-              });
+              send("ended", { sessionId: event.payload.sessionId, reason: event.payload.reason });
               controller.close();
               break;
-            case "chunk":
-              // Raw terminal output — skip for now
-              break;
             case "hook":
-              send("hook", {
-                hookEventName: event.payload.hookEventName,
-                toolName: event.payload.toolName,
-              });
-              if (
-                event.payload.hookEventName === "agent_end" ||
-                event.payload.hookEventName === "session_shutdown"
-              ) {
+              send("hook", { hookEventName: event.payload.hookEventName, toolName: event.payload.toolName });
+              if (event.payload.hookEventName === "agent_end" || event.payload.hookEventName === "session_shutdown") {
                 send("done", {});
                 controller.close();
               }
               break;
             case "status":
-              send("status", {
-                sessionId: event.payload.sessionId,
-                status: event.payload.status,
-              });
+              send("status", { sessionId: event.payload.sessionId, status: event.payload.status });
               break;
             default:
               break;
           }
         });
 
-        // If threadId provided, send follow-up to existing session
         if (body.threadId && sessionId !== body.threadId) {
-          await adapter.sendPrompt({
-            sessionId: body.threadId,
-            prompt: body.message!,
-          });
+          await adapter.sendPrompt({ sessionId: body.threadId, prompt: body.message! });
         }
       } catch (error) {
-        send("error", {
-          error: error instanceof Error ? error.message : "Stream failed",
-        });
+        send("error", { error: error instanceof Error ? error.message : "Stream failed" });
         controller.close();
       }
 
-      // Cleanup on client disconnect
       request.signal.addEventListener("abort", () => {
         unsub?.();
         controller.close();
