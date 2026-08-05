@@ -12,6 +12,7 @@ export interface ClineStreamState {
 export interface UseClineStreamReturn extends ClineStreamState {
   sendMessage: (text: string, threadId?: string) => void;
   clearError: () => void;
+  loadMessages: (messages: UIMessage[], threadId: string) => void;
 }
 
 export interface StreamEvent {
@@ -111,7 +112,13 @@ export function useClineStream(): UseClineStreamReturn {
     const controller = new AbortController();
     abortRef.current = controller;
     const activeThreadId = threadId ?? stateRef.current.threadId;
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    const userMsg: UIMessage = { type: "human", content: text };
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, userMsg],
+      isLoading: true,
+      error: null,
+    }));
 
     (async () => {
       try {
@@ -157,5 +164,14 @@ export function useClineStream(): UseClineStreamReturn {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
-  return { ...state, sendMessage, clearError };
+  const loadMessages = useCallback((messages: UIMessage[], tid: string) => {
+    setState({
+      messages,
+      isLoading: false,
+      error: null,
+      threadId: tid,
+    });
+  }, []);
+
+  return { ...state, sendMessage, clearError, loadMessages };
 }

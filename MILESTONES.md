@@ -434,6 +434,34 @@ These block safe adapter design:
 
 ---
 
+## Milestone 11 — Remove Unused LangGraph Code
+
+**Goal:** Strip all dead LangGraph imports, dependencies, and boilerplate that are no longer wired up.
+
+### What I will do
+1. Run `grep -r '@langchain' src/` to find every remaining LangGraph import.
+2. For each file: check if the import is actually used. If not, remove it.
+3. Remove unused LangGraph packages from `package.json`: `@langchain/langgraph-sdk`, `@langchain/core`, `@langchain/langgraph`, `langgraph-nextjs-api-passthrough`.
+4. Run `pnpm install` to clean the lockfile.
+5. Delete orphaned files: `src/providers/client.ts`, `src/lib/ensure-tool-responses.ts`, `src/lib/agent-inbox-interrupt.ts`, `src/lib/multimodal-utils.ts`, `src/components/icons/langgraph.tsx`, `src/app/api/[..._path]/route.ts` (the LangGraph proxy).
+6. Run `pnpm typecheck`, `pnpm test`, `pnpm build`.
+
+### 🧪 Test plan
+| # | Test | Command / Action | Pass criteria |
+|---|------|------------------|---------------|
+| 11.1 | No LangGraph imports | `grep -r '@langchain' src/` | Zero results. |
+| 11.2 | No LangGraph deps | `grep langgraph package.json` | Zero results. |
+| 11.3 | Type gate | `pnpm typecheck` | Zero errors. |
+| 11.4 | Tests pass | `pnpm test` | All tests pass. |
+| 11.5 | Build passes | `pnpm build` | Builds successfully. |
+| 11.6 | App works | `pnpm dev` + use chat | Everything still works. |
+
+### 🚪 Exit criteria
+- Zero `@langchain` references in source or dependencies.
+- All tests pass, build works, chat works.
+
+---
+
 ## Summary
 
 | Milestone | Human sees | Tests |

@@ -16,6 +16,7 @@ import type {
   StartSessionInput,
   ThreadSummary,
 } from "./cline-types";
+import { resolveDefaultProvider } from "./session-reader";
 
 // Re-export types so consumers don't need to import from this file's internals
 export type { ClineAdapterOptions, ThreadSummary, SendPromptInput, StartSessionInput };
@@ -70,6 +71,9 @@ export async function createClineAdapter(
     backendMode: options.backendMode ?? "auto",
   });
 
+  // Resolve default provider/model from user's Cline data
+  const defaults = await resolveDefaultProvider();
+
   return {
     core,
 
@@ -81,8 +85,8 @@ export async function createClineAdapter(
           enableSpawnAgent: false,
           enableAgentTeams: false,
           cwd: process.cwd(),
-          providerId: input.providerId ?? "",
-          modelId: input.modelId ?? "",
+          providerId: input.providerId || defaults.providerId,
+          modelId: input.modelId || defaults.modelId,
         },
         source: (input.source ?? "web") as string,
         prompt: input.prompt,

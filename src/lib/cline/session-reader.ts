@@ -11,6 +11,65 @@ import * as os from "node:os";
 import type { ThreadSummary, UIMessage } from "./cline-types";
 import { mapClineMessages } from "./map-messages";
 
+// ---------------------------------------------------------------------------
+// Default provider/model resolution
+// ---------------------------------------------------------------------------
+
+interface ProvidersFile {
+  lastUsedProvider?: string;
+  providers?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface RecentSession {
+  provider?: string;
+  model?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Resolve the default providerId and modelId from the user's Cline data.
+ * Tries the most recent session first, then falls back to providers.json.
+ */
+export async function resolveDefaultProvider(): Promise<{ providerId: string; modelId: string }> {
+  const dataDir = join(os.homedir(), ".cline", "data");
+
+  // Try most recent session's manifest
+  try {
+    const sessionsDir = join(dataDir, "sessions");
+    const entries = await readdir(sessionsDir);
+    // Sort by name descending (newest first — IDs are timestamp-based)
+    entries.sort((a, b) => b.localeCompare(a));
+
+    for (const entry of entries.slice(0, 5)) {
+      try {
+        const raw = await readFile(join(sessionsDir, entry, `${entry}.json`), "utf-8");
+        const manifest: RecentSession = JSON.parse(raw);
+        if (manifest.provider && manifest.model) {
+          return { providerId: manifest.provider, modelId: manifest.model };
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // sessions dir doesn't exist
+  }
+
+  // Fallback to providers.json
+  try {
+    const raw = await readFile(join(dataDir, "settings", "providers.json"), "utf-8");
+    const settings: ProvidersFile = JSON.parse(raw);
+    if (settings.lastUsedProvider) {
+      return { providerId: settings.lastUsedProvider, modelId: "" };
+    }
+  } catch {
+    // settings file doesn't exist
+  }
+
+  return { providerId: "", modelId: "" };
+}
+
 /** Shape of a session manifest JSON on disk. */
 interface SessionManifest {
   session_id: string;
@@ -149,8 +208,10 @@ export async function readSessionFromDisk(
     const raw = await readFile(messagesPath, "utf-8");
     const messagesFile: MessagesFile = JSON.parse(raw);
     if (messagesFile.messages) {
+      // Limit to last 50 messages to avoid rendering crashes on long sessions
+      const recent = messagesFile.messages.slice(-50);
       uiMessages = mapClineMessages(
-        messagesFile.messages.map((m) => ({
+        recent.map((m) => ({
           role: m.role,
           content: m.content as unknown as import("./cline-types").ContentBlock[],
           id: m.id,

@@ -32,6 +32,10 @@ vi.mock("@cline/sdk", () => ({
   },
 }));
 
+vi.mock("@/lib/cline/session-reader", () => ({
+  resolveDefaultProvider: vi.fn().mockResolvedValue({ providerId: "test-provider", modelId: "test-model" }),
+}));
+
 import { createClineAdapter } from "../adapter";
 import { ClineCore } from "@cline/sdk";
 
@@ -79,6 +83,21 @@ describe("createClineAdapter", () => {
           modelId: "claude-sonnet",
           systemPrompt: "",
           enableTools: true,
+        }),
+      }),
+    );
+  });
+
+  it("uses default provider when none specified", async () => {
+    mockStart.mockResolvedValue({ sessionId: "sess-456" });
+
+    await adapter.startSession({ prompt: "Hi" });
+
+    expect(mockStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          providerId: "test-provider",
+          modelId: "test-model",
         }),
       }),
     );

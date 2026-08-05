@@ -13,7 +13,7 @@ let adapterSingleton: Awaited<ReturnType<typeof createClineAdapter>> | null = nu
 
 async function getAdapter() {
   if (!adapterSingleton) {
-    adapterSingleton = await createClineAdapter({ clientName: "agents-window-web" });
+    adapterSingleton = await createClineAdapter({ clientName: "agents-window-web", backendMode: "local" });
   }
   return adapterSingleton;
 }
@@ -63,14 +63,8 @@ export async function POST(request: Request) {
 
       try {
         const adapter = await getAdapter();
-        const { sessionId } = await adapter.startSession({
-          prompt: body.message,
-          source: "web",
-          ...(body.threadId && { threadId: body.threadId }),
-        });
 
-        send("session", { sessionId });
-
+        // Subscribe BEFORE starting so we don't miss early events
         unsub = adapter.subscribe((event: CoreSessionEvent) => {
           switch (event.type) {
             case "agent_event":
@@ -95,10 +89,19 @@ export async function POST(request: Request) {
           }
         });
 
+        const { sessionId } = await adapter.startSession({
+          prompt: body.message,
+          source: "web",
+          ...(body.threadId && { threadId: body.threadId }),
+        });
+
+        send("session", { sessionId });
+
         if (body.threadId && sessionId !== body.threadId) {
           await adapter.sendPrompt({ sessionId: body.threadId, prompt: body.message! });
         }
       } catch (error) {
+        console.error("[/api/chat/stream] Error:", error);
         send("error", { error: error instanceof Error ? error.message : "Stream failed" });
         controller.close();
       }

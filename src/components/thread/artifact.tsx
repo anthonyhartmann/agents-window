@@ -7,6 +7,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -103,10 +104,10 @@ export function ArtifactProvider(props: { children?: ReactNode }) {
   const mounted = useState<string | null>(null);
   const context = useState<Record<string, unknown>>({});
 
+  const value = useMemo(() => ({ open, mounted, title, content, context }), [open, mounted, title, content, context]);
+
   return (
-    <ArtifactSlotContext.Provider
-      value={{ open, mounted, title, content, context }}
-    >
+    <ArtifactSlotContext.Provider value={value}>
       {props.children}
     </ArtifactSlotContext.Provider>
   );

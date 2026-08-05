@@ -1,52 +1,25 @@
-import { parsePartialJson } from "@langchain/core/output_parsers";
 import { useStreamContext } from "@/providers/Stream";
-import { AIMessage, Checkpoint, Message } from "@langchain/langgraph-sdk";
-import { useStream } from "@langchain/langgraph-sdk/react";
 import { getContentString } from "../utils";
 import { BranchSwitcher, CommandBar } from "./shared";
 import { MarkdownText } from "../markdown-text";
-import { LoadExternalComponent } from "@langchain/langgraph-sdk/react-ui";
 import { cn } from "@/lib/utils";
 import { ToolCalls, ToolResult } from "./tool-calls";
-import { MessageContentComplex } from "@langchain/core/messages";
-import { Fragment } from "react/jsx-runtime";
-import { isAgentInboxInterruptSchema } from "@/lib/agent-inbox-interrupt";
-import { ThreadView } from "../agent-inbox";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
-import { useArtifact } from "../artifact";
+import type { UIMessage } from "@/lib/cline/cline-types";
 
-function CustomComponent({
-  message,
-  thread,
-}: {
-  message: Message;
+function CustomComponent(_props: {
+  message: UIMessage;
   thread: ReturnType<typeof useStreamContext>;
 }) {
-  const artifact = useArtifact();
-  const { values } = useStreamContext();
-  const customComponents = values.ui?.filter(
-    (ui) => ui.metadata?.message_id === message.id,
-  );
-
-  if (!customComponents?.length) return null;
-  return (
-    <Fragment key={message.id}>
-      {customComponents.map((customComponent) => (
-        <LoadExternalComponent
-          key={customComponent.id}
-          stream={thread as unknown as ReturnType<typeof useStream>}
-          message={customComponent}
-          meta={{ ui: customComponent, artifact }}
-        />
-      ))}
-    </Fragment>
-  );
+  // Stubbed: custom UI components from LangGraph are not supported
+  return null;
 }
 
 function parseAnthropicStreamedToolCalls(
-  content: MessageContentComplex[],
-): AIMessage["tool_calls"] {
+  content: UIMessage["content"],
+): UIMessage["tool_calls"] {
+  if (!Array.isArray(content)) return undefined;
   const toolCallContents = content.filter((c) => c.type === "tool_use" && c.id);
 
   return toolCallContents.map((tc) => {
@@ -54,7 +27,7 @@ function parseAnthropicStreamedToolCalls(
     let json: Record<string, any> = {};
     if (toolCall?.input) {
       try {
-        json = parsePartialJson(toolCall.input) ?? {};
+        json = JSON.parse(toolCall.input) ?? {};
       } catch {
         // Pass
       }
@@ -63,7 +36,7 @@ function parseAnthropicStreamedToolCalls(
       name: toolCall.name ?? "",
       id: toolCall.id ?? "",
       args: json,
-      type: "tool_call",
+      type: "tool_call" as const,
     };
   });
 }
@@ -86,12 +59,7 @@ function Interrupt({
 
   return (
     <>
-      {isAgentInboxInterruptSchema(interrupt) &&
-        (isLastMessage || hasNoAIOrToolMessages) && (
-          <ThreadView interrupt={interrupt} />
-        )}
       {interrupt &&
-      !isAgentInboxInterruptSchema(interrupt) &&
       (isLastMessage || hasNoAIOrToolMessages) ? (
         <GenericInterruptView interrupt={fallbackValue} />
       ) : null}
@@ -104,9 +72,9 @@ export function AssistantMessage({
   isLoading,
   handleRegenerate,
 }: {
-  message: Message | undefined;
+  message: UIMessage | undefined;
   isLoading: boolean;
-  handleRegenerate: (parentCheckpoint: Checkpoint | null | undefined) => void;
+  handleRegenerate: () => void;
 }) {
   const content = message?.content ?? [];
   const contentString = getContentString(content);
@@ -121,7 +89,7 @@ export function AssistantMessage({
   const hasNoAIOrToolMessages = !thread.messages.find(
     (m) => m.type === "ai" || m.type === "tool",
   );
-  const meta = message ? thread.getMessagesMetadata(message) : undefined;
+  const meta = message ? (thread.getMessagesMetadata as any)?.(message) : undefined;
   const threadInterrupt = thread.interrupt;
 
   const parentCheckpoint = meta?.firstSeenState?.parent_checkpoint;
@@ -200,14 +168,14 @@ export function AssistantMessage({
               <BranchSwitcher
                 branch={meta?.branch}
                 branchOptions={meta?.branchOptions}
-                onSelect={(branch) => thread.setBranch(branch)}
+                onSelect={(branch) => thread.setBranch?.(branch)}
                 isLoading={isLoading}
               />
               <CommandBar
                 content={contentString}
                 isLoading={isLoading}
                 isAiMessage={true}
-                handleRegenerate={() => handleRegenerate(parentCheckpoint)}
+                handleRegenerate={() => handleRegenerate()}
               />
             </div>
           </>

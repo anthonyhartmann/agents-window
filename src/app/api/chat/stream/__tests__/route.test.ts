@@ -22,12 +22,12 @@ beforeEach(() => {
   mockStartSession.mockResolvedValue({ sessionId: "new-session" });
 });
 
-/** Subscribe mock that immediately emits "ended" to close the stream. */
+/** Subscribe mock that emits "ended" after a short delay (after startSession resolves). */
 function subscribeEnding() {
   mockSubscribe.mockImplementation((cb: (e: CoreSessionEvent) => void) => {
-    queueMicrotask(() => {
+    setTimeout(() => {
       cb({ type: "ended", payload: { sessionId: "s1", reason: "done", ts: 0 } });
-    });
+    }, 20);
     return () => {};
   });
 }
@@ -99,7 +99,7 @@ describe("POST /api/chat/stream", () => {
 
   it("streams agent_event from subscriber", async () => {
     mockSubscribe.mockImplementation((cb: (e: CoreSessionEvent) => void) => {
-      queueMicrotask(() => {
+      setTimeout(() => {
         cb({
           type: "agent_event",
           payload: {
@@ -108,7 +108,7 @@ describe("POST /api/chat/stream", () => {
           },
         });
         cb({ type: "ended", payload: { sessionId: "s1", reason: "done", ts: 0 } });
-      });
+      }, 20);
       return () => {};
     });
 

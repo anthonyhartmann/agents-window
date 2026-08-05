@@ -62,7 +62,7 @@ export function ThreadView({ interrupt }: ThreadViewProps) {
         <StateView
           handleShowSidePanel={handleShowSidePanel}
           description={activeDescription}
-          values={thread.values}
+          values={thread.values as Record<string, any>}
           view={showState ? "state" : "description"}
         />
       ) : (

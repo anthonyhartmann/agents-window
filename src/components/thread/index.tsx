@@ -1,17 +1,11 @@
-import { v4 as uuidv4 } from "uuid";
 import { ReactNode, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
 import { useState, FormEvent } from "react";
 import { Button } from "../ui/button";
-import { Checkpoint, Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
-import {
-  DO_NOT_RENDER_ID_PREFIX,
-  ensureToolCallsHaveResponses,
-} from "@/lib/ensure-tool-responses";
 import { LangGraphLogoSVG } from "../icons/langgraph";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
@@ -29,14 +23,7 @@ import ThreadHistory from "./history";
 import { toast } from "sonner";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
 import { GitHubSVG } from "../icons/github";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
 import { useFileUpload } from "@/hooks/use-file-upload";
 import { ContentBlocksPreview } from "./ContentBlocksPreview";
 import {
@@ -45,6 +32,9 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import type { UIMessage } from "@/lib/cline/cline-types";
+
+const DO_NOT_RENDER_ID_PREFIX = "DO_NOT_RENDER_";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -89,39 +79,34 @@ function ScrollToBottom(props: { className?: string }) {
 
 function OpenGitHubRepo() {
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <a
-            href="https://github.com/langchain-ai/agent-chat-ui"
-            target="_blank"
-            className="flex items-center justify-center"
-          >
-            <GitHubSVG
-              width="24"
-              height="24"
-            />
-          </a>
-        </TooltipTrigger>
-        <TooltipContent side="left">
-          <p>Open GitHub repo</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <a
+      href="https://github.com/langchain-ai/agent-chat-ui"
+      target="_blank"
+      className="flex items-center justify-center"
+      title="Open GitHub repo"
+    >
+      <GitHubSVG
+        width="24"
+        height="24"
+      />
+    </a>
   );
 }
 
 export function Thread() {
+  // DEBUG: track re-renders
+  const renderRef = useRef(0);
+  renderRef.current++;
+  if (renderRef.current > 3) {
+    console.log(`[Thread] render #${renderRef.current}`);
+  }
+
   const [artifactContext, setArtifactContext] = useArtifactContext();
   const [artifactOpen, closeArtifact] = useArtifactOpen();
 
   const [threadId, _setThreadId] = useQueryState("threadId");
   const [chatHistoryOpen, setChatHistoryOpen] = useQueryState(
     "chatHistoryOpen",
-    parseAsBoolean.withDefault(false),
-  );
-  const [hideToolCalls, setHideToolCalls] = useQueryState(
-    "hideToolCalls",
     parseAsBoolean.withDefault(false),
   );
   const [input, setInput] = useState("");
@@ -138,9 +123,7 @@ export function Thread() {
   const [firstTokenReceived, setFirstTokenReceived] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
 
-  const stream = useStreamContext();
-  const messages = stream.messages;
-  const isLoading = stream.isLoading;
+  const { messages, isLoading, error, submit, interrupt, stop } = useStreamContext();
 
   const lastError = useRef<string | undefined>(undefined);
 
@@ -153,12 +136,12 @@ export function Thread() {
   };
 
   useEffect(() => {
-    if (!stream.error) {
+    if (!error) {
       lastError.current = undefined;
       return;
     }
     try {
-      const message = (stream.error as any).message;
+      const message = (error as any).message;
       if (!message || lastError.current === message) {
         // Message has already been logged. do not modify ref, return early.
         return;
@@ -178,7 +161,7 @@ export function Thread() {
     } catch {
       // no-op
     }
-  }, [stream.error]);
+  }, [error]);
 
   // TODO: this should be part of the useStream hook
   const prevMessageLength = useRef(0);
@@ -200,54 +183,14 @@ export function Thread() {
       return;
     setFirstTokenReceived(false);
 
-    const newHumanMessage: Message = {
-      id: uuidv4(),
-      type: "human",
-      content: [
-        ...(input.trim().length > 0 ? [{ type: "text", text: input }] : []),
-        ...contentBlocks,
-      ] as Message["content"],
-    };
-
-    const toolMessages = ensureToolCallsHaveResponses(stream.messages);
-
-    const context =
-      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
-
-    stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
-      {
-        streamMode: ["values"],
-        streamSubgraphs: true,
-        streamResumable: true,
-        optimisticValues: (prev) => ({
-          ...prev,
-          context,
-          messages: [
-            ...(prev.messages ?? []),
-            ...toolMessages,
-            newHumanMessage,
-          ],
-        }),
-      },
-    );
-
+    submit(input);
     setInput("");
     setContentBlocks([]);
   };
 
-  const handleRegenerate = (
-    parentCheckpoint: Checkpoint | null | undefined,
-  ) => {
-    // Do this so the loading state is correct
-    prevMessageLength.current = prevMessageLength.current - 1;
-    setFirstTokenReceived(false);
-    stream.submit(undefined, {
-      checkpoint: parentCheckpoint,
-      streamMode: ["values"],
-      streamSubgraphs: true,
-      streamResumable: true,
-    });
+  const handleRegenerate = () => {
+    // Stubbed — regenerate not yet supported with Cline backend
+    toast.info("Regeneration not yet supported");
   };
 
   const chatStarted = !!threadId || !!messages.length;
@@ -404,13 +347,13 @@ export function Thread() {
                     .map((message, index) =>
                       message.type === "human" ? (
                         <HumanMessage
-                          key={message.id || `${message.type}-${index}`}
+                          key={`${message.type}-${index}`}
                           message={message}
                           isLoading={isLoading}
                         />
                       ) : (
                         <AssistantMessage
-                          key={message.id || `${message.type}-${index}`}
+                          key={`${message.type}-${index}`}
                           message={message}
                           isLoading={isLoading}
                           handleRegenerate={handleRegenerate}
@@ -419,7 +362,7 @@ export function Thread() {
                     )}
                   {/* Special rendering case where there are no AI/tool messages, but there is an interrupt.
                     We need to render it outside of the messages list, since there are no messages to render */}
-                  {hasNoAIOrToolMessages && !!stream.interrupt && (
+                  {hasNoAIOrToolMessages && !!interrupt && (
                     <AssistantMessage
                       key="interrupt-msg"
                       message={undefined}
@@ -484,21 +427,6 @@ export function Thread() {
                       />
 
                       <div className="flex items-center gap-6 p-2 pt-4">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="render-tool-calls"
-                              checked={hideToolCalls ?? false}
-                              onCheckedChange={setHideToolCalls}
-                            />
-                            <Label
-                              htmlFor="render-tool-calls"
-                              className="text-sm text-gray-600"
-                            >
-                              Hide Tool Calls
-                            </Label>
-                          </div>
-                        </div>
                         <Label
                           htmlFor="file-input"
                           className="flex cursor-pointer items-center gap-2"
@@ -516,10 +444,10 @@ export function Thread() {
                           accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
                           className="hidden"
                         />
-                        {stream.isLoading ? (
+                        {isLoading ? (
                           <Button
                             key="stop"
-                            onClick={() => stream.stop()}
+                            onClick={() => stop?.()}
                             className="ml-auto"
                           >
                             <LoaderCircle className="h-4 w-4 animate-spin" />

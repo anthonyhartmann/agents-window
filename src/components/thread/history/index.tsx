@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { useThreads } from "@/providers/Thread";
-import { Thread } from "@langchain/langgraph-sdk";
+import { type ThreadSummary } from "@/lib/cline/cline-types";
 import { useEffect } from "react";
 
-import { getContentString } from "../utils";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import {
   Sheet,
@@ -19,45 +18,29 @@ function ThreadList({
   threads,
   onThreadClick,
 }: {
-  threads: Thread[];
+  threads: ThreadSummary[];
   onThreadClick?: (threadId: string) => void;
 }) {
   const [threadId, setThreadId] = useQueryState("threadId");
 
   return (
     <div className="flex h-full w-full flex-col items-start justify-start gap-2 overflow-y-scroll [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent">
-      {threads.map((t) => {
-        let itemText = t.thread_id;
-        if (
-          typeof t.values === "object" &&
-          t.values &&
-          "messages" in t.values &&
-          Array.isArray(t.values.messages) &&
-          t.values.messages?.length > 0
-        ) {
-          const firstMessage = t.values.messages[0];
-          itemText = getContentString(firstMessage.content);
-        }
-        return (
-          <div
-            key={t.thread_id}
-            className="w-full px-1"
+      {threads.map((t) => (
+        <div key={t.id} className="w-full px-1">
+          <Button
+            variant="ghost"
+            className="w-[280px] items-start justify-start text-left font-normal"
+            onClick={(e) => {
+              e.preventDefault();
+              onThreadClick?.(t.id);
+              if (t.id === threadId) return;
+              setThreadId(t.id);
+            }}
           >
-            <Button
-              variant="ghost"
-              className="w-[280px] items-start justify-start text-left font-normal"
-              onClick={(e) => {
-                e.preventDefault();
-                onThreadClick?.(t.thread_id);
-                if (t.thread_id === threadId) return;
-                setThreadId(t.thread_id);
-              }}
-            >
-              <p className="truncate text-ellipsis">{itemText}</p>
-            </Button>
-          </div>
-        );
-      })}
+            <p className="truncate text-ellipsis">{t.title}</p>
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }

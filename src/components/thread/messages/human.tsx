@@ -1,12 +1,12 @@
 import { useStreamContext } from "@/providers/Stream";
-import { Message } from "@langchain/langgraph-sdk";
 import { useState } from "react";
 import { getContentString } from "../utils";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
-import { BranchSwitcher, CommandBar } from "./shared";
+import { CommandBar } from "./shared";
 import { MultimodalPreview } from "@/components/thread/MultimodalPreview";
 import { isBase64ContentBlock } from "@/lib/multimodal-utils";
+import type { UIMessage } from "@/lib/cline/cline-types";
 
 function EditableContent({
   value,
@@ -38,12 +38,10 @@ export function HumanMessage({
   message,
   isLoading,
 }: {
-  message: Message;
+  message: UIMessage;
   isLoading: boolean;
 }) {
   const thread = useStreamContext();
-  const meta = thread.getMessagesMetadata(message);
-  const parentCheckpoint = meta?.firstSeenState?.parent_checkpoint;
 
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -51,26 +49,7 @@ export function HumanMessage({
 
   const handleSubmitEdit = () => {
     setIsEditing(false);
-
-    const newMessage: Message = { type: "human", content: value };
-    thread.submit(
-      { messages: [newMessage] },
-      {
-        checkpoint: parentCheckpoint,
-        streamMode: ["values"],
-        streamSubgraphs: true,
-        streamResumable: true,
-        optimisticValues: (prev) => {
-          const values = meta?.firstSeenState?.values;
-          if (!values) return prev;
-
-          return {
-            ...values,
-            messages: [...(values.messages ?? []), newMessage],
-          };
-        },
-      },
-    );
+    thread.submit(value);
   };
 
   return (
@@ -125,12 +104,6 @@ export function HumanMessage({
             isEditing && "opacity-100",
           )}
         >
-          <BranchSwitcher
-            branch={meta?.branch}
-            branchOptions={meta?.branchOptions}
-            onSelect={(branch) => thread.setBranch(branch)}
-            isLoading={isLoading}
-          />
           <CommandBar
             isLoading={isLoading}
             content={contentString}

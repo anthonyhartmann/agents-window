@@ -175,8 +175,8 @@ export function ThreadActionsView({
         type: "approve",
       }));
 
-      stream.submit(
-        {},
+      (stream.submit as any)(
+        undefined,
         {
           command: {
             resume: { decisions: allDecisions },
@@ -222,8 +222,8 @@ export function ThreadActionsView({
         return decision;
       });
 
-      stream.submit(
-        {},
+      (stream.submit as any)(
+        undefined,
         {
           command: {
             resume: { decisions: allDecisions },

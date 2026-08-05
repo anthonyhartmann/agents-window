@@ -1,4 +1,4 @@
-import { AIMessage, ToolMessage } from "@langchain/langgraph-sdk";
+import type { UIMessage } from "@/lib/cline/cline-types";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -10,7 +10,7 @@ function isComplexValue(value: any): boolean {
 export function ToolCalls({
   toolCalls,
 }: {
-  toolCalls: AIMessage["tool_calls"];
+  toolCalls: UIMessage["tool_calls"];
 }) {
   if (!toolCalls || toolCalls.length === 0) return null;
 
@@ -65,7 +65,7 @@ export function ToolCalls({
   );
 }
 
-export function ToolResult({ message }: { message: ToolMessage }) {
+export function ToolResult({ message }: { message: UIMessage }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   let parsedContent: any;
