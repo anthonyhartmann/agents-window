@@ -67,110 +67,57 @@ export function mapAgentEvent(event: CoreSessionEvent): StreamChunk[] {
 
 type AgentEventPayload = Extract<CoreSessionEvent, { type: "agent_event" }>["payload"]["event"];
 
-function mapAgentInnerEvent(event: AgentEventPayload, sessionId: string): StreamChunk[] {
+function mapAgentInnerEvent(event: AgentEventPayload, _sessionId: string): StreamChunk[] {
   const ts = Date.now();
 
   switch (event.type) {
     case "content_start": {
-      if (event.contentType === "text") {
-        return [{ type: "text_start", ts }];
-      }
-      if (event.contentType === "reasoning") {
-        return [{ type: "thinking_start", ts }];
-      }
-      if (event.contentType === "tool" && event.toolName && event.toolCallId) {
-        return [
-          {
-            type: "tool_call_start",
-            toolCall: {
-              id: event.toolCallId,
-              name: event.toolName,
-              args: (event.input as Record<string, unknown>) ?? {},
-            },
-            ts,
-          },
-        ];
+      const { contentType = "", toolCallId = "", toolName = "" } = event;
+      if (contentType === "text") return [{ type: "text_start", ts }];
+      if (contentType === "reasoning") return [{ type: "thinking_start", ts }];
+      if (contentType === "tool" && toolName && toolCallId) {
+        const args = ("input" in event ? (event.input ?? {}) : {}) as Record<string, unknown>;
+        return [{ type: "tool_call_start", toolCall: { id: toolCallId, name: toolName, args }, ts }];
       }
       return [];
     }
 
     case "content_update": {
-      if (event.contentType === "tool" && event.toolCallId && event.toolName) {
-        return [
-          {
-            type: "tool_call_delta",
-            toolCall: {
-              id: event.toolCallId,
-              name: event.toolName,
-              result: event.update,
-            },
-            ts,
-          },
-        ];
+      const { contentType = "", toolCallId = "", toolName = "", update } = event;
+      if (contentType === "tool" && toolCallId && toolName) {
+        return [{ type: "tool_call_delta", toolCall: { id: toolCallId, name: toolName, result: update }, ts }];
       }
       return [];
     }
 
     case "content_end": {
-      if (event.contentType === "text") {
-        return [
-          {
-            type: "text_end",
-            text: event.text ?? "",
-            ts,
-          },
-        ];
-      }
-      if (event.contentType === "reasoning") {
-        return [
-          {
-            type: "thinking_end",
-            reasoning: event.reasoning ?? "",
-            ts,
-          },
-        ];
-      }
-      if (event.contentType === "tool" && event.toolCallId && event.toolName) {
-        const chunks: StreamChunk[] = [
-          {
-            type: "tool_call_end",
-            toolCall: {
-              id: event.toolCallId,
-              name: event.toolName,
-              result: event.output,
-              ...(event.error && { error: event.error }),
-            },
-            ts,
-          },
-        ];
-        return chunks;
+      const { contentType = "", toolCallId = "", toolName = "" } = event;
+      const text = "text" in event ? (event.text ?? "") : "";
+      const reasoning = "reasoning" in event ? (event.reasoning ?? "") : "";
+      const output = "output" in event ? (event.output ?? "") : "";
+      const error = "error" in event && event.error ? String(event.error) : "";
+
+      if (contentType === "text") return [{ type: "text_end", text, ts }];
+      if (contentType === "reasoning") return [{ type: "thinking_end", reasoning, ts }];
+      if (contentType === "tool" && toolCallId && toolName) {
+        return [{ type: "tool_call_end", toolCall: { id: toolCallId, name: toolName, result: output, ...(error && { error }) }, ts }];
       }
       return [];
     }
 
     case "iteration_start":
-      return [];
-
     case "iteration_end":
-      return [];
-
     case "usage":
-      return [];
-
     case "notice":
       return [];
 
     case "done":
       return [{ type: "done", ts }];
 
-    case "error":
-      return [
-        {
-          type: "error",
-          error: event.error instanceof Error ? event.error.message : String(event.error),
-          ts,
-        },
-      ];
+    case "error": {
+      const msg = event.error instanceof Error ? event.error.message : String(event.error);
+      return [{ type: "error", error: msg, ts }];
+    }
 
     default:
       return [];
