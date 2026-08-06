@@ -58,17 +58,39 @@ export function processEvent(
       const error = String(e.error ?? "");
 
       if (t === "content_start" && contentType === "text") {
-        // Deduplicate: don't push if last message is already an empty AI placeholder
         const last = messages[messages.length - 1];
-        if (!(last?.type === "ai" && last.content === "")) {
+        if (last?.type === "ai") {
+          // Starting a new text block within the same AI message.
+          // Preserve any finalized content from prior blocks.
+          const content = (last.content as string) ?? "";
+          if (content) {
+            // Carry forward finalized content via a hidden field
+            const finalized = (last as Record<string, unknown>)._finalizedContent as string ?? "";
+            messages[messages.length - 1] = {
+              ...last,
+              content: "",
+              _finalizedContent: finalized + content,
+            } as UIMessage;
+          }
+        } else {
           messages.push(aiMessage(""));
         }
       }
 
       if (t === "content_start" && contentType === "reasoning") {
-        // Deduplicate: don't push if last message is already an empty AI placeholder
         const last = messages[messages.length - 1];
-        if (!(last?.type === "ai" && last.content === "")) {
+        if (last?.type === "ai") {
+          // Same pattern: preserve finalized reasoning from prior blocks
+          const reasoning = last.reasoning ?? "";
+          if (reasoning) {
+            const finalizedR = (last as Record<string, unknown>)._finalizedReasoning as string ?? "";
+            messages[messages.length - 1] = {
+              ...last,
+              reasoning: "",
+              _finalizedReasoning: finalizedR + reasoning,
+            } as UIMessage;
+          }
+        } else {
           messages.push(aiMessage("", { reasoning: "" }));
         }
       }
@@ -91,8 +113,9 @@ export function processEvent(
       if (t === "content_end" && contentType === "reasoning" && reasoning) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].type === "ai") {
+            const finalizedR = (messages[i] as Record<string, unknown>)._finalizedReasoning as string ?? "";
             messages[i] = aiMessage(messages[i].content as string, {
-              reasoning,
+              reasoning: finalizedR + reasoning,
             });
             break;
           }
@@ -104,7 +127,8 @@ export function processEvent(
         if (delta) {
           for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].type === "ai") {
-              messages[i] = aiMessage(delta, {
+              const existing = (messages[i].content as string) ?? "";
+              messages[i] = aiMessage(existing + delta, {
                 reasoning: messages[i].reasoning,
               });
               break;
@@ -116,7 +140,8 @@ export function processEvent(
       if (t === "content_end" && contentType === "text" && text) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].type === "ai") {
-            messages[i] = aiMessage(text, {
+            const finalized = (messages[i] as Record<string, unknown>)._finalizedContent as string ?? "";
+            messages[i] = aiMessage(finalized + text, {
               reasoning: messages[i].reasoning,
             });
             break;

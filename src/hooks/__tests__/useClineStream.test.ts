@@ -260,9 +260,8 @@ describe("useClineStream", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     const aiMessages = result.current.messages.filter((m) => m.type === "ai");
-    expect(aiMessages).toHaveLength(2);
-    expect(aiMessages[0].content).toBe("First");
-    expect(aiMessages[1].content).toBe("Second");
+    expect(aiMessages).toHaveLength(1);
+    expect(aiMessages[0].content).toBe("FirstSecond");
   });
 
   it("handles tool call lifecycle: start → result", async () => {
