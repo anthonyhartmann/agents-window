@@ -87,7 +87,6 @@ export async function createClineAdapter(
           cwd: process.cwd(),
           providerId: input.providerId || defaults.providerId,
           modelId: input.modelId || defaults.modelId,
-          ...(input.threadId && { sessionId: input.threadId }),
         },
         source: (input.source ?? "web") as string,
         prompt: input.prompt,

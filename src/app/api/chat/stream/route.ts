@@ -101,13 +101,21 @@ export async function POST(request: Request) {
           }
         });
 
-        const { sessionId } = await adapter.startSession({
-          prompt: body.message,
-          source: "web",
-          ...(body.threadId && { threadId: body.threadId }),
-        });
-
-        send("session", { sessionId });
+        let sessionId: string;
+        if (body.threadId) {
+          // Resume existing session — the agent is still in memory
+          sessionId = body.threadId;
+          send("session", { sessionId });
+          await adapter.sendPrompt({ sessionId, prompt: body.message! });
+        } else {
+          // New session
+          const result = await adapter.startSession({
+            prompt: body.message,
+            source: "web",
+          });
+          sessionId = result.sessionId;
+          send("session", { sessionId });
+        }
       } catch (error) {
         console.error("[/api/chat/stream] Error:", error);
         send("error", { error: error instanceof Error ? error.message : "Stream failed" });

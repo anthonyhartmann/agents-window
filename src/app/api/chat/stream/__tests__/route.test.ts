@@ -130,17 +130,17 @@ describe("POST /api/chat/stream", () => {
     expect(text).toContain("Boom");
   });
 
-  it("resumes existing thread via startSession with threadId", async () => {
-    mockStartSession.mockResolvedValue({ sessionId: "existing-id" });
+  it("resumes existing thread via sendPrompt", async () => {
     subscribeEnding();
 
     const res = await POST(makePost({ message: "continue", threadId: "existing-id" }));
     const text = await collectSSE(res);
 
-    expect(mockStartSession).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "continue", source: "web", threadId: "existing-id" }),
-    );
-    expect(mockSendPrompt).not.toHaveBeenCalled();
+    expect(mockStartSession).not.toHaveBeenCalled();
+    expect(mockSendPrompt).toHaveBeenCalledWith({
+      sessionId: "existing-id",
+      prompt: "continue",
+    });
     expect(text).toContain('"sessionId":"existing-id"');
   });
 
@@ -153,7 +153,6 @@ describe("POST /api/chat/stream", () => {
     expect(mockStartSession).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "hello", source: "web" }),
     );
-    expect(mockStartSession.mock.calls[0][0].threadId).toBeUndefined();
     expect(mockSendPrompt).not.toHaveBeenCalled();
   });
 });
