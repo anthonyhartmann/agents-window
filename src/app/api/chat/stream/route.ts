@@ -103,10 +103,15 @@ export async function POST(request: Request) {
 
         let sessionId: string;
         if (body.threadId) {
-          // Resume existing session — the agent is still in memory
-          sessionId = body.threadId;
-          send("session", { sessionId });
-          await adapter.sendPrompt({ sessionId, prompt: body.message! });
+          // Resume: load conversation history from disk and start a fresh
+          // session seeded with prior context so the agent has memory.
+          const existing = await adapter.readMessages(body.threadId);
+          const result = await adapter.startSession({
+            prompt: body.message,
+            source: "web",
+            initialMessages: existing,
+          });
+          sessionId = result.sessionId;
         } else {
           // New session
           const result = await adapter.startSession({
@@ -114,8 +119,9 @@ export async function POST(request: Request) {
             source: "web",
           });
           sessionId = result.sessionId;
-          send("session", { sessionId });
         }
+
+        send("session", { sessionId });
       } catch (error) {
         console.error("[/api/chat/stream] Error:", error);
         send("error", { error: error instanceof Error ? error.message : "Stream failed" });

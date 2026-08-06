@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { CoreSessionEvent } from "@/lib/cline/cline-types";
 
-const { mockStartSession, mockSendPrompt, mockSubscribe } = vi.hoisted(() => ({
+const { mockStartSession, mockSendPrompt, mockReadMessages, mockSubscribe } = vi.hoisted(() => ({
   mockStartSession: vi.fn(),
   mockSendPrompt: vi.fn(),
+  mockReadMessages: vi.fn(),
   mockSubscribe: vi.fn(),
 }));
 
@@ -11,6 +12,7 @@ vi.mock("@/lib/cline/adapter", () => ({
   createClineAdapter: vi.fn().mockResolvedValue({
     startSession: mockStartSession,
     sendPrompt: mockSendPrompt,
+    readMessages: mockReadMessages,
     subscribe: mockSubscribe,
   }),
 }));
@@ -130,18 +132,23 @@ describe("POST /api/chat/stream", () => {
     expect(text).toContain("Boom");
   });
 
-  it("resumes existing thread via sendPrompt", async () => {
+  it("resumes existing thread by loading history and starting new session", async () => {
+    mockStartSession.mockResolvedValue({ sessionId: "resumed-session" });
+    mockReadMessages.mockResolvedValue([{ role: "user", content: "hi" }]);
     subscribeEnding();
 
     const res = await POST(makePost({ message: "continue", threadId: "existing-id" }));
     const text = await collectSSE(res);
 
-    expect(mockStartSession).not.toHaveBeenCalled();
-    expect(mockSendPrompt).toHaveBeenCalledWith({
-      sessionId: "existing-id",
-      prompt: "continue",
-    });
-    expect(text).toContain('"sessionId":"existing-id"');
+    expect(mockReadMessages).toHaveBeenCalledWith("existing-id");
+    expect(mockStartSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: "continue",
+        source: "web",
+        initialMessages: [{ role: "user", content: "hi" }],
+      }),
+    );
+    expect(text).toContain('"sessionId":"resumed-session"');
   });
 
   it("starts new session when no threadId provided", async () => {
@@ -153,6 +160,6 @@ describe("POST /api/chat/stream", () => {
     expect(mockStartSession).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "hello", source: "web" }),
     );
-    expect(mockSendPrompt).not.toHaveBeenCalled();
+    expect(mockReadMessages).not.toHaveBeenCalled();
   });
 });

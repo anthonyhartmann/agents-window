@@ -74,6 +74,8 @@ export interface StartSessionInput {
   threadId?: string;
   /** Base64-encoded user images. */
   userImages?: string[];
+  /** Prior messages to seed a resumed session (SDK Message format). */
+  initialMessages?: unknown[];
 
 }
 

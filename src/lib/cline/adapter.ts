@@ -91,6 +91,7 @@ export async function createClineAdapter(
         source: (input.source ?? "web") as string,
         prompt: input.prompt,
         userImages: input.userImages,
+        ...(input.initialMessages && { initialMessages: input.initialMessages as any }),
       });
 
       return { sessionId: result.sessionId };
