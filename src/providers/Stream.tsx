@@ -40,37 +40,50 @@ function StreamSession({ children }: { children: ReactNode }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const lastLoadedId = useRef<string | null>(null);
 
-  // Fetch message history when threadId changes (sidebar click)
+  // Seed threadId from the URL on mount in case nuqs hasn't hydrated yet
+  const initialThreadIdRef = useRef<string | null>(null);
+  if (typeof window !== "undefined" && initialThreadIdRef.current === null) {
+    const params = new URLSearchParams(window.location.search);
+    initialThreadIdRef.current = params.get("threadId");
+  }
+  const resolvedThreadId = threadId ?? initialThreadIdRef.current;
+
+  // Fetch message history when threadId changes (sidebar click or direct URL)
   useEffect(() => {
-    if (!threadId) return;
-    if (threadId === lastLoadedId.current) return;
+    if (!resolvedThreadId) return;
+    if (resolvedThreadId === lastLoadedId.current) return;
+
+    // Sync nuqs state if it hasn't picked up the URL param yet
+    if (!threadId && initialThreadIdRef.current) {
+      setThreadId(initialThreadIdRef.current);
+    }
 
     // Clear messages immediately so old thread's messages don't flash
-    loadMessages([], threadId);
+    loadMessages([], resolvedThreadId);
     setLoadingHistory(true);
-    lastLoadedId.current = threadId;
+    lastLoadedId.current = resolvedThreadId;
 
-    fetch(`/api/threads/${threadId}`)
+    fetch(`/api/threads/${resolvedThreadId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load thread");
         return res.json();
       })
       .then((data: { messages?: UIMessage[] }) => {
-        loadMessages(data.messages ?? [], threadId);
+        loadMessages(data.messages ?? [], resolvedThreadId);
       })
       .catch((err) => {
         console.error("Failed to load thread history:", err);
         lastLoadedId.current = null; // Allow retry
       })
       .finally(() => setLoadingHistory(false));
-  }, [threadId, loadMessages]);
+  }, [resolvedThreadId, loadMessages, setThreadId, threadId]);
 
   const submit = useCallback(
     (message: string | undefined, _config?: Record<string, unknown>) => {
       if (!message) return;
-      sendMessage(message, threadId ?? undefined);
+      sendMessage(message, resolvedThreadId ?? undefined);
     },
-    [sendMessage, threadId],
+    [sendMessage, resolvedThreadId],
   );
 
   const value: StreamContextType = useMemo(() => ({
@@ -78,10 +91,10 @@ function StreamSession({ children }: { children: ReactNode }) {
     isLoading: isLoading || loadingHistory,
     streamStatus: loadingHistory ? "connecting" : streamStatus,
     error,
-    threadId: clineThreadId ?? threadId,
+    threadId: clineThreadId ?? resolvedThreadId,
     submit,
     stop,
-  }), [messages, isLoading, loadingHistory, streamStatus, error, clineThreadId, threadId, submit, stop]);
+  }), [messages, isLoading, loadingHistory, streamStatus, error, clineThreadId, resolvedThreadId, submit, stop]);
 
   return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>;
 }
