@@ -101,19 +101,11 @@ export async function POST(request: Request) {
           }
         });
 
-        let sessionId: string;
-        if (body.threadId) {
-          // Resume existing thread
-          sessionId = body.threadId;
-          await adapter.sendPrompt({ sessionId: body.threadId, prompt: body.message! });
-        } else {
-          // Start new session
-          const result = await adapter.startSession({
-            prompt: body.message,
-            source: "web",
-          });
-          sessionId = result.sessionId;
-        }
+        const { sessionId } = await adapter.startSession({
+          prompt: body.message,
+          source: "web",
+          ...(body.threadId && { threadId: body.threadId }),
+        });
 
         send("session", { sessionId });
       } catch (error) {

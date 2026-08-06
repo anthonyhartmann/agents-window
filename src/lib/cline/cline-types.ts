@@ -70,6 +70,8 @@ export interface StartSessionInput {
   modelId?: string;
   /** Source identifier. */
   source?: string;
+  /** Existing thread ID to resume. */
+  threadId?: string;
   /** Base64-encoded user images. */
   userImages?: string[];
 
