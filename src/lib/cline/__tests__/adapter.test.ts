@@ -186,7 +186,7 @@ describe("createClineAdapter", () => {
     const listener = vi.fn();
     const result = adapter.subscribe(listener);
 
-    expect(mockSubscribe).toHaveBeenCalledWith(listener);
+    expect(mockSubscribe).toHaveBeenCalledWith(listener, undefined);
     expect(result).toBe(unsub);
   });
 
