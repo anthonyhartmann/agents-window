@@ -16,6 +16,7 @@ import {
   SquarePen,
   XIcon,
   Plus,
+  Brain,
 } from "lucide-react";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
@@ -101,6 +102,10 @@ export function Thread() {
   const [chatHistoryOpen, setChatHistoryOpen] = useQueryState(
     "chatHistoryOpen",
     parseAsBoolean.withDefault(false),
+  );
+  const [showThinking, setShowThinking] = useQueryState(
+    "showThinking",
+    parseAsBoolean.withDefault(true),
   );
   const [input, setInput] = useState("");
   const {
@@ -306,7 +311,19 @@ export function Thread() {
                 </motion.button>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowThinking((p) => !p)}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                    showThinking
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/50"
+                  }`}
+                  title={showThinking ? "Hide thinking" : "Show thinking"}
+                >
+                  <Brain className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Thinking</span>
+                </button>
                 <div className="flex items-center">
                   <OpenGitHubRepo />
                 </div>
@@ -350,6 +367,7 @@ export function Thread() {
                           message={message}
                           isLoading={isLoading}
                           handleRegenerate={handleRegenerate}
+                          showThinking={showThinking}
                         />
                       ),
                     )}

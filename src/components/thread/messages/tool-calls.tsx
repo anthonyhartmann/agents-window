@@ -1,191 +1,172 @@
 import type { UIMessage } from "@/lib/cline/cline-types";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Wrench,
+} from "lucide-react";
 
 function isComplexValue(value: any): boolean {
   return Array.isArray(value) || (typeof value === "object" && value !== null);
 }
 
+function TruncatedArgs({ args }: { args: Record<string, any> }) {
+  const keys = Object.keys(args);
+  if (keys.length === 0) return <span className="text-muted-foreground">{}</span>;
+  const summary = keys
+    .slice(0, 3)
+    .map((k) => {
+      const v = args[k];
+      const s = isComplexValue(v) ? JSON.stringify(v) : String(v);
+      return `${k}=${s.length > 40 ? s.slice(0, 40) + "…" : s}`;
+    })
+    .join(", ");
+  const extra = keys.length > 3 ? ` +${keys.length - 3} more` : "";
+  return (
+    <span className="truncate text-muted-foreground text-xs">
+      {summary}
+      {extra}
+    </span>
+  );
+}
+
 export function ToolCalls({
   toolCalls,
+  isLoading,
 }: {
   toolCalls: UIMessage["tool_calls"];
+  isLoading?: boolean;
 }) {
   if (!toolCalls || toolCalls.length === 0) return null;
 
   return (
-    <div className="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2">
+    <div className="flex flex-col gap-1">
       {toolCalls.map((tc, idx) => {
         const args = tc.args as Record<string, any>;
         const hasArgs = Object.keys(args).length > 0;
-        return (
-          <div
-            key={idx}
-            className="overflow-hidden rounded-lg border border-gray-200"
-          >
-            <div className="border-b border-gray-200 bg-gray-50 px-4 py-2">
-              <h3 className="font-medium text-gray-900">
-                {tc.name}
-                {tc.id && (
-                  <code className="ml-2 rounded bg-gray-100 px-2 py-1 text-sm">
-                    {tc.id}
-                  </code>
-                )}
-              </h3>
-            </div>
-            {hasArgs ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <tbody className="divide-y divide-gray-200">
-                  {Object.entries(args).map(([key, value], argIdx) => (
-                    <tr key={argIdx}>
-                      <td className="px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-900">
-                        {key}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">
-                        {isComplexValue(value) ? (
-                          <code className="rounded bg-gray-50 px-2 py-1 font-mono text-sm break-all">
-                            {JSON.stringify(value, null, 2)}
-                          </code>
-                        ) : (
-                          String(value)
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <code className="block p-3 text-sm">{"{}"}</code>
-            )}
-          </div>
-        );
+        return <ToolCallItem key={tc.id || idx} toolCall={tc} hasArgs={hasArgs} isLoading={isLoading} />;
       })}
     </div>
   );
 }
 
-export function ToolResult({ message }: { message: UIMessage }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  let parsedContent: any;
-  let isJsonContent = false;
-
-  try {
-    if (typeof message.content === "string") {
-      parsedContent = JSON.parse(message.content);
-      isJsonContent = isComplexValue(parsedContent);
-    }
-  } catch {
-    // Content is not JSON, use as is
-    parsedContent = message.content;
-  }
-
-  const contentStr = isJsonContent
-    ? JSON.stringify(parsedContent, null, 2)
-    : String(message.content);
-  const contentLines = contentStr.split("\n");
-  const shouldTruncate = contentLines.length > 4 || contentStr.length > 500;
-  const displayedContent =
-    shouldTruncate && !isExpanded
-      ? contentStr.length > 500
-        ? contentStr.slice(0, 500) + "..."
-        : contentLines.slice(0, 4).join("\n") + "\n..."
-      : contentStr;
+function ToolCallItem({
+  toolCall,
+  hasArgs,
+  isLoading,
+}: {
+  toolCall: { name: string; args: Record<string, unknown>; id?: string; type?: string };
+  hasArgs: boolean;
+  isLoading?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2">
-      <div className="overflow-hidden rounded-lg border border-gray-200">
-        <div className="border-b border-gray-200 bg-gray-50 px-4 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {message.name ? (
-              <h3 className="font-medium text-gray-900">
-                Tool Result:{" "}
-                <code className="rounded bg-gray-100 px-2 py-1">
-                  {message.name}
-                </code>
-              </h3>
-            ) : (
-              <h3 className="font-medium text-gray-900">Tool Result</h3>
-            )}
-            {message.tool_call_id && (
-              <code className="ml-2 rounded bg-gray-100 px-2 py-1 text-sm">
-                {message.tool_call_id}
-              </code>
-            )}
-          </div>
-        </div>
-        <motion.div
-          className="min-w-full bg-gray-100"
-          initial={false}
-          animate={{ height: "auto" }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="p-3">
-            <AnimatePresence
-              mode="wait"
-              initial={false}
-            >
-              <motion.div
-                key={isExpanded ? "expanded" : "collapsed"}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                {isJsonContent ? (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <tbody className="divide-y divide-gray-200">
-                      {(Array.isArray(parsedContent)
-                        ? isExpanded
-                          ? parsedContent
-                          : parsedContent.slice(0, 5)
-                        : Object.entries(parsedContent)
-                      ).map((item, argIdx) => {
-                        const [key, value] = Array.isArray(parsedContent)
-                          ? [argIdx, item]
-                          : [item[0], item[1]];
-                        return (
-                          <tr key={argIdx}>
-                            <td className="px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-900">
-                              {key}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-500">
-                              {isComplexValue(value) ? (
-                                <code className="rounded bg-gray-50 px-2 py-1 font-mono text-sm break-all">
-                                  {JSON.stringify(value, null, 2)}
-                                </code>
-                              ) : (
-                                String(value)
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <code className="block text-sm">{displayedContent}</code>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-          {((shouldTruncate && !isJsonContent) ||
-            (isJsonContent &&
-              Array.isArray(parsedContent) &&
-              parsedContent.length > 5)) && (
-            <motion.button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="flex w-full cursor-pointer items-center justify-center border-t-[1px] border-gray-200 py-2 text-gray-500 transition-all duration-200 ease-in-out hover:bg-gray-50 hover:text-gray-600"
-              initial={{ scale: 1 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {isExpanded ? <ChevronUp /> : <ChevronDown />}
-            </motion.button>
+    <div className="flex flex-col">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted/50 transition-colors cursor-pointer"
+      >
+        <Wrench className="h-3 w-3 shrink-0 text-muted-foreground" />
+        <span className="font-medium text-foreground/80">{toolCall.name}</span>
+        {!expanded && hasArgs && <TruncatedArgs args={toolCall.args as Record<string, any>} />}
+        <span className="ml-auto shrink-0">
+          {expanded ? (
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
           )}
-        </motion.div>
-      </div>
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="ml-5 rounded-md bg-muted/30 p-2 text-xs font-mono">
+              {hasArgs ? (
+                <pre className="whitespace-pre-wrap break-all text-muted-foreground">
+                  {JSON.stringify(toolCall.args, null, 2)}
+                </pre>
+              ) : (
+                <span className="text-muted-foreground">{}</span>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function ToolResult({ message, isLoading }: { message: UIMessage; isLoading?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const name = message.name ?? "tool";
+  const hasContent = message.content && String(message.content).length > 0;
+  const isError = message.status === "error";
+  const isRunning = isLoading && !hasContent;
+
+  return (
+    <div className="flex flex-col">
+      <button
+        onClick={() => hasContent && setExpanded(!expanded)}
+        className={`flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors ${
+          hasContent ? "hover:bg-muted/50 cursor-pointer" : "cursor-default"
+        }`}
+      >
+        {isRunning ? (
+          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+        ) : isError ? (
+          <XCircle className="h-3 w-3 shrink-0 text-red-500" />
+        ) : (
+          <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500" />
+        )}
+        <span className="font-medium text-foreground/80">{name}</span>
+        {isRunning && (
+          <span className="text-muted-foreground animate-pulse">running…</span>
+        )}
+        {!isRunning && hasContent && (
+          <span className="truncate text-muted-foreground text-xs max-w-[300px]">
+            {String(message.content).slice(0, 100)}
+            {String(message.content).length > 100 ? "…" : ""}
+          </span>
+        )}
+        {hasContent && (
+          <span className="ml-auto shrink-0">
+            {expanded ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            )}
+          </span>
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && hasContent && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="ml-5 rounded-md bg-muted/30 p-2 text-xs font-mono">
+              <pre className="whitespace-pre-wrap break-all text-muted-foreground max-h-60 overflow-y-auto">
+                {String(message.content)}
+              </pre>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

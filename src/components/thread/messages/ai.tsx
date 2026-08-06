@@ -1,14 +1,12 @@
 import { useStreamContext } from "@/providers/Stream";
-import { getContentString } from "../utils";
-import { BranchSwitcher, CommandBar } from "./shared";
 import { MarkdownText } from "../markdown-text";
 import { cn } from "@/lib/utils";
 import { ToolCalls, ToolResult } from "./tool-calls";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
 import type { UIMessage } from "@/lib/cline/cline-types";
-import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Brain, Loader2 as ThinkingSpinner } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
 function CustomComponent(_props: {
   message: UIMessage;
@@ -73,13 +71,14 @@ export function AssistantMessage({
   message,
   isLoading,
   handleRegenerate,
+  showThinking = true,
 }: {
   message: UIMessage | undefined;
   isLoading: boolean;
   handleRegenerate: () => void;
+  showThinking?: boolean;
 }) {
   const content = message?.content ?? [];
-  const contentString = getContentString(content);
   const [hideToolCalls] = useQueryState(
     "hideToolCalls",
     parseAsBoolean.withDefault(false),
@@ -118,7 +117,7 @@ export function AssistantMessage({
       <div className="flex w-full flex-col gap-2">
         {isToolResult ? (
           <>
-            <ToolResult message={message} />
+            <ToolResult message={message} isLoading={isLoading} />
             <Interrupt
               interrupt={threadInterrupt}
               isLastMessage={isLastMessage}
@@ -133,20 +132,20 @@ export function AssistantMessage({
               </div>
             )}
 
-            {message?.reasoning && (
-              <ReasoningBlock reasoning={message.reasoning} />
+            {showThinking && message?.reasoning && (
+              <ReasoningBlock reasoning={message.reasoning} isLoading={isLoading} />
             )}
 
             {!hideToolCalls && (
               <>
                 {(hasToolCalls && toolCallsHaveContents && (
-                  <ToolCalls toolCalls={message.tool_calls} />
+                  <ToolCalls toolCalls={message.tool_calls} isLoading={isLoading} />
                 )) ||
                   (hasAnthropicToolCalls && (
-                    <ToolCalls toolCalls={anthropicStreamedToolCalls} />
+                    <ToolCalls toolCalls={anthropicStreamedToolCalls} isLoading={isLoading} />
                   )) ||
                   (hasToolCalls && (
-                    <ToolCalls toolCalls={message.tool_calls} />
+                    <ToolCalls toolCalls={message.tool_calls} isLoading={isLoading} />
                   ))}
               </>
             )}
@@ -162,25 +161,6 @@ export function AssistantMessage({
               isLastMessage={isLastMessage}
               hasNoAIOrToolMessages={hasNoAIOrToolMessages}
             />
-            <div
-              className={cn(
-                "mr-auto flex items-center gap-2 transition-opacity",
-                "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
-              )}
-            >
-              <BranchSwitcher
-                branch={undefined}
-                branchOptions={undefined}
-                onSelect={(branch) => thread.setBranch?.(branch)}
-                isLoading={isLoading}
-              />
-              <CommandBar
-                content={contentString}
-                isLoading={isLoading}
-                isAiMessage={true}
-                handleRegenerate={() => handleRegenerate()}
-              />
-            </div>
           </>
         )}
       </div>
@@ -211,25 +191,34 @@ export function StreamingIndicator() {
   );
 }
 
-function ReasoningBlock({ reasoning }: { reasoning: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+function ReasoningBlock({ reasoning, isLoading }: { reasoning: string; isLoading?: boolean }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   if (!reasoning) return null;
 
   return (
     <div className="border-l-2 border-muted pl-3 py-1">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <span>Thinking</span>
+        <Brain className="h-3 w-3" />
+        <span className="font-medium">Thinking</span>
+        {isLoading && !isCollapsed && (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        )}
       </button>
-      {isOpen && (
-        <div className="mt-2 text-sm text-muted-foreground italic">
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300 ease-in-out",
+          isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100",
+        )}
+      >
+        <div ref={contentRef} className="mt-2 text-sm text-muted-foreground italic">
           <MarkdownText>{reasoning}</MarkdownText>
         </div>
-      )}
+      </div>
     </div>
   );
 }
