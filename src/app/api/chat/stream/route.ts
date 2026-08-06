@@ -105,10 +105,13 @@ export async function POST(request: Request) {
         if (body.threadId) {
           // Resume: load conversation history from disk and start a fresh
           // session seeded with prior context so the agent has memory.
-          const existing = await adapter.readMessages(body.threadId);
+          const allMessages = await adapter.readMessages(body.threadId);
+          const existing = Array.isArray(allMessages) ? allMessages.slice(-50) : [];
+          console.log(`[/api/chat/stream] Resume thread ${body.threadId}: loaded ${existing.length} messages (of ${Array.isArray(allMessages) ? allMessages.length : 0})`);
           const result = await adapter.startSession({
             prompt: body.message,
             source: "web",
+            threadId: body.threadId,
             initialMessages: existing,
           });
           sessionId = result.sessionId;
