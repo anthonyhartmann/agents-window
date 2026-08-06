@@ -65,7 +65,7 @@ export function processEvent(
           const content = (last.content as string) ?? "";
           if (content) {
             // Carry forward finalized content via a hidden field
-            const finalized = (last as Record<string, unknown>)._finalizedContent as string ?? "";
+            const finalized = (last as unknown as Record<string, unknown>)._finalizedContent as string ?? "";
             messages[messages.length - 1] = {
               ...last,
               content: "",
@@ -83,7 +83,7 @@ export function processEvent(
           // Same pattern: preserve finalized reasoning from prior blocks
           const reasoning = last.reasoning ?? "";
           if (reasoning) {
-            const finalizedR = (last as Record<string, unknown>)._finalizedReasoning as string ?? "";
+            const finalizedR = (last as unknown as Record<string, unknown>)._finalizedReasoning as string ?? "";
             messages[messages.length - 1] = {
               ...last,
               reasoning: "",
@@ -113,7 +113,7 @@ export function processEvent(
       if (t === "content_end" && contentType === "reasoning" && reasoning) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].type === "ai") {
-            const finalizedR = (messages[i] as Record<string, unknown>)._finalizedReasoning as string ?? "";
+            const finalizedR = (messages[i] as unknown as Record<string, unknown>)._finalizedReasoning as string ?? "";
             messages[i] = aiMessage(messages[i].content as string, {
               reasoning: finalizedR + reasoning,
             });
@@ -140,7 +140,7 @@ export function processEvent(
       if (t === "content_end" && contentType === "text" && text) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].type === "ai") {
-            const finalized = (messages[i] as Record<string, unknown>)._finalizedContent as string ?? "";
+            const finalized = (messages[i] as unknown as Record<string, unknown>)._finalizedContent as string ?? "";
             messages[i] = aiMessage(finalized + text, {
               reasoning: messages[i].reasoning,
             });
