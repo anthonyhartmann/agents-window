@@ -58,12 +58,19 @@ export function processEvent(
       const error = String(e.error ?? "");
 
       if (t === "content_start" && contentType === "text") {
-        messages.push(aiMessage(""));
+        // Deduplicate: don't push if last message is already an empty AI placeholder
+        const last = messages[messages.length - 1];
+        if (!(last?.type === "ai" && last.content === "")) {
+          messages.push(aiMessage(""));
+        }
       }
 
       if (t === "content_start" && contentType === "reasoning") {
-        // Start a new AI message for reasoning content
-        messages.push(aiMessage("", { reasoning: "" }));
+        // Deduplicate: don't push if last message is already an empty AI placeholder
+        const last = messages[messages.length - 1];
+        if (!(last?.type === "ai" && last.content === "")) {
+          messages.push(aiMessage(""));
+        }
       }
 
       if (t === "content_update" && contentType === "reasoning") {
