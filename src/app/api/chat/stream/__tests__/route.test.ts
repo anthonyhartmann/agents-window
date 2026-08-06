@@ -130,26 +130,29 @@ describe("POST /api/chat/stream", () => {
     expect(text).toContain("Boom");
   });
 
-  it("calls sendPrompt when threadId is provided and IDs differ", async () => {
-    mockStartSession.mockResolvedValue({ sessionId: "new-sess" });
+  it("resumes existing thread via sendPrompt", async () => {
     subscribeEnding();
 
     const res = await POST(makePost({ message: "continue", threadId: "existing-id" }));
-    await collectSSE(res);
+    const text = await collectSSE(res);
 
+    expect(mockStartSession).not.toHaveBeenCalled();
     expect(mockSendPrompt).toHaveBeenCalledWith({
       sessionId: "existing-id",
       prompt: "continue",
     });
+    expect(text).toContain('"sessionId":"existing-id"');
   });
 
-  it("does not call sendPrompt when IDs match", async () => {
-    mockStartSession.mockResolvedValue({ sessionId: "same-id" });
+  it("starts new session when no threadId provided", async () => {
     subscribeEnding();
 
-    const res = await POST(makePost({ message: "continue", threadId: "same-id" }));
+    const res = await POST(makePost({ message: "hello" }));
     await collectSSE(res);
 
+    expect(mockStartSession).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "hello", source: "web" }),
+    );
     expect(mockSendPrompt).not.toHaveBeenCalled();
   });
 });

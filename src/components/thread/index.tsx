@@ -80,7 +80,7 @@ function ScrollToBottom(props: { className?: string }) {
 function OpenGitHubRepo() {
   return (
     <a
-      href="https://github.com/langchain-ai/agent-chat-ui"
+      href="https://github.com/anthonyhartmann/agents-window"
       target="_blank"
       className="flex items-center justify-center"
       title="Open GitHub repo"
@@ -94,13 +94,6 @@ function OpenGitHubRepo() {
 }
 
 export function Thread() {
-  // DEBUG: track re-renders
-  const renderRef = useRef(0);
-  renderRef.current++;
-  if (renderRef.current > 3) {
-    console.log(`[Thread] render #${renderRef.current}`);
-  }
-
   const [artifactContext, setArtifactContext] = useArtifactContext();
   const [artifactOpen, closeArtifact] = useArtifactOpen();
 

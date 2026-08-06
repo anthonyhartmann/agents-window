@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { render, act } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, act, cleanup } from "@testing-library/react";
 import React, { useState } from "react";
 import { TooltipIconButton } from "../tooltip-icon-button";
 
 describe("TooltipIconButton", () => {
+  afterEach(() => cleanup());
+
   it("renders without crashing", () => {
     const { getByRole } = render(
       <TooltipIconButton tooltip="Test">Click me</TooltipIconButton>,
@@ -43,7 +45,7 @@ describe("TooltipIconButton", () => {
       <TooltipIconButton tooltip="My tooltip">X</TooltipIconButton>,
     );
     const buttons = getAllByRole("button");
-    expect(buttons[0].getAttribute("title")).toBe("Test");
+    expect(buttons[0].getAttribute("title")).toBe("My tooltip");
   });
 
   it("forwards ref correctly", () => {

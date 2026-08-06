@@ -373,4 +373,49 @@ describe("useClineStream", () => {
     expect(aiMessages).toHaveLength(1);
     expect(aiMessages[0].content).toBe("Chunked!");
   });
+
+  it("stop aborts an in-flight stream", async () => {
+    // Fetch mock that rejects when the abort signal fires
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
+      }),
+    );
+
+    const { result } = renderHook(() => useClineStream());
+
+    act(() => result.current.sendMessage("hello"));
+    expect(result.current.isLoading).toBe(true);
+
+    act(() => result.current.stop());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it("handles content_update:text by updating last AI message", async () => {
+    mockFetch(
+      sse(
+        'event: agent_event\ndata: {"type":"content_start","contentType":"text"}\n\n' +
+        'event: agent_event\ndata: {"type":"content_update","contentType":"text","update":"Hello"}\n\n' +
+        'event: agent_event\ndata: {"type":"content_end","contentType":"text","text":"Hello, world!"}\n\n' +
+        'event: ended\ndata: {}\n\n',
+      ),
+    );
+
+    const { result } = renderHook(() => useClineStream());
+
+    act(() => result.current.sendMessage("hi"));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // Final text from content_end should win over content_update
+    const aiMessages = result.current.messages.filter((m) => m.type === "ai");
+    expect(aiMessages).toHaveLength(1);
+    expect(aiMessages[0].content).toBe("Hello, world!");
+  });
 });

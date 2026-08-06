@@ -55,8 +55,20 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          /* controller already closed — swallow */
+        }
+      };
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        unsub?.();
+        try { controller.close(); } catch { /* already closed */ }
       };
 
       let unsub: (() => void) | undefined;
@@ -72,13 +84,13 @@ export async function POST(request: Request) {
               break;
             case "ended":
               send("ended", { sessionId: event.payload.sessionId, reason: event.payload.reason });
-              controller.close();
+              close();
               break;
             case "hook":
               send("hook", { hookEventName: event.payload.hookEventName, toolName: event.payload.toolName });
               if (event.payload.hookEventName === "agent_end" || event.payload.hookEventName === "session_shutdown") {
                 send("done", {});
-                controller.close();
+                close();
               }
               break;
             case "status":
@@ -89,26 +101,29 @@ export async function POST(request: Request) {
           }
         });
 
-        const { sessionId } = await adapter.startSession({
-          prompt: body.message,
-          source: "web",
-          ...(body.threadId && { threadId: body.threadId }),
-        });
+        let sessionId: string;
+        if (body.threadId) {
+          // Resume existing thread
+          sessionId = body.threadId;
+          await adapter.sendPrompt({ sessionId: body.threadId, prompt: body.message! });
+        } else {
+          // Start new session
+          const result = await adapter.startSession({
+            prompt: body.message,
+            source: "web",
+          });
+          sessionId = result.sessionId;
+        }
 
         send("session", { sessionId });
-
-        if (body.threadId && sessionId !== body.threadId) {
-          await adapter.sendPrompt({ sessionId: body.threadId, prompt: body.message! });
-        }
       } catch (error) {
         console.error("[/api/chat/stream] Error:", error);
         send("error", { error: error instanceof Error ? error.message : "Stream failed" });
-        controller.close();
+        close();
       }
 
       request.signal.addEventListener("abort", () => {
-        unsub?.();
-        controller.close();
+        close();
       });
     },
   });

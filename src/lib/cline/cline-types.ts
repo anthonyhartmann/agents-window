@@ -38,51 +38,6 @@ export interface ThreadSummary {
 }
 
 // ---------------------------------------------------------------------------
-// Stream chunk (SSE event payload sent to the browser)
-// ---------------------------------------------------------------------------
-
-/**
- * The shape of a single SSE event pushed to the browser during streaming.
- * This mirrors what the LangGraph SDK's `useStream` hook expects so existing
- * UI components work without changes.
- */
-export interface StreamChunk {
-  /** Discriminator for the chunk type. */
-  type:
-    | "text_start"
-    | "text_delta"
-    | "text_end"
-    | "thinking_start"
-    | "thinking_delta"
-    | "thinking_end"
-    | "tool_call_start"
-    | "tool_call_delta"
-    | "tool_call_end"
-    | "tool_result"
-    | "error"
-    | "done"
-    | "status";
-  /** For text chunks: the accumulated or delta text. */
-  text?: string;
-  /** For thinking chunks: reasoning text. */
-  reasoning?: string;
-  /** For tool call chunks. */
-  toolCall?: {
-    id: string;
-    name: string;
-    args?: Record<string, unknown>;
-    result?: unknown;
-    error?: string;
-  };
-  /** For status updates. */
-  status?: string;
-  /** For error events. */
-  error?: string;
-  /** Timestamp in ms. */
-  ts?: number;
-}
-
-// ---------------------------------------------------------------------------
 // UI message (matches LangGraph Message shape)
 // ---------------------------------------------------------------------------
 
@@ -117,8 +72,7 @@ export interface StartSessionInput {
   source?: string;
   /** Base64-encoded user images. */
   userImages?: string[];
-  /** Existing thread ID to resume. */
-  threadId?: string;
+
 }
 
 // ---------------------------------------------------------------------------

@@ -175,7 +175,7 @@ export function ThreadActionsView({
         type: "approve",
       }));
 
-      (stream.submit as any)(
+      stream.submit(
         undefined,
         {
           command: {
@@ -222,7 +222,7 @@ export function ThreadActionsView({
         return decision;
       });
 
-      (stream.submit as any)(
+      stream.submit(
         undefined,
         {
           command: {

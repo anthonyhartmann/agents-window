@@ -86,7 +86,7 @@ export default function useInterruptedActions({
 
   const resumeRun = (decisions: Decision[]): boolean => {
     try {
-      (thread.submit as any)(
+      thread.submit(
         undefined,
         {
           command: {
@@ -188,7 +188,7 @@ export default function useInterruptedActions({
     initialHumanInterruptEditValue.current = {};
 
     try {
-      (thread.submit as any)(
+      thread.submit(
         undefined,
         {
           command: {

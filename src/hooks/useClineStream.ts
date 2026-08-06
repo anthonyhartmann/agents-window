@@ -13,6 +13,7 @@ export interface UseClineStreamReturn extends ClineStreamState {
   sendMessage: (text: string, threadId?: string) => void;
   clearError: () => void;
   loadMessages: (messages: UIMessage[], threadId: string) => void;
+  stop: () => void;
 }
 
 export interface StreamEvent {
@@ -56,9 +57,21 @@ export function processEvent(
         messages.push(aiMessage(""));
       }
 
+      if (t === "content_update" && contentType === "text") {
+        const delta = String(e.update ?? "");
+        if (delta) {
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].type === "ai") {
+              messages[i] = aiMessage(delta);
+              break;
+            }
+          }
+        }
+      }
+
       if (t === "content_end" && contentType === "text" && text) {
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].type === "ai" && messages[i].content === "") {
+          if (messages[i].type === "ai") {
             messages[i] = aiMessage(text);
             break;
           }
@@ -151,7 +164,10 @@ export function useClineStream(): UseClineStreamReturn {
         }
         setState((prev) => ({ ...prev, isLoading: false }));
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setState((prev) => ({ ...prev, isLoading: false }));
+          return;
+        }
         setState((prev) => ({
           ...prev, isLoading: false,
           error: err instanceof Error ? err.message : "Stream failed",
@@ -173,5 +189,9 @@ export function useClineStream(): UseClineStreamReturn {
     });
   }, []);
 
-  return { ...state, sendMessage, clearError, loadMessages };
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  return { ...state, sendMessage, clearError, loadMessages, stop };
 }

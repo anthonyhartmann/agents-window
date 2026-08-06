@@ -85,14 +85,11 @@ export function AssistantMessage({
 
   const thread = useStreamContext();
   const isLastMessage =
-    thread.messages[thread.messages.length - 1].id === message?.id;
+    thread.messages.at(-1)?.id === message?.id;
   const hasNoAIOrToolMessages = !thread.messages.find(
     (m) => m.type === "ai" || m.type === "tool",
   );
-  const meta = message ? (thread.getMessagesMetadata as any)?.(message) : undefined;
   const threadInterrupt = thread.interrupt;
-
-  const parentCheckpoint = meta?.firstSeenState?.parent_checkpoint;
   const anthropicStreamedToolCalls = Array.isArray(content)
     ? parseAnthropicStreamedToolCalls(content)
     : undefined;
@@ -166,8 +163,8 @@ export function AssistantMessage({
               )}
             >
               <BranchSwitcher
-                branch={meta?.branch}
-                branchOptions={meta?.branchOptions}
+                branch={undefined}
+                branchOptions={undefined}
                 onSelect={(branch) => thread.setBranch?.(branch)}
                 isLoading={isLoading}
               />

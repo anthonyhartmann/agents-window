@@ -24,10 +24,9 @@ export interface StreamContextType {
   error: string | null;
   threadId: string | null;
   submit: (message: string | undefined, config?: Record<string, unknown>) => void;
-  stop?: () => void;
+  stop: () => void;
   values?: Record<string, unknown>;
   interrupt?: unknown;
-  getMessagesMetadata?: () => Record<string, unknown>;
   setBranch?: (branch: string) => void;
 }
 
@@ -35,17 +34,10 @@ const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 function StreamSession({ children }: { children: ReactNode }) {
   const [threadId, setThreadId] = useQueryState("threadId");
-  const { threadId: clineThreadId, messages, isLoading, error, sendMessage, loadMessages, clearError } = useClineStream();
+  const { threadId: clineThreadId, messages, isLoading, error, sendMessage, loadMessages, clearError, stop } = useClineStream();
 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const lastLoadedId = useRef<string | null>(null);
-
-  // DEBUG: track re-renders
-  const renderRef = useRef(0);
-  renderRef.current++;
-  if (renderRef.current > 5) {
-    console.log(`[StreamSession] render #${renderRef.current}`, { threadId, clineThreadId, loadingHistory, messagesLen: messages.length });
-  }
 
   // Fetch message history when threadId changes (sidebar click)
   useEffect(() => {
@@ -86,7 +78,8 @@ function StreamSession({ children }: { children: ReactNode }) {
     error,
     threadId: clineThreadId ?? threadId,
     submit,
-  }), [messages, isLoading, loadingHistory, error, clineThreadId, threadId, submit]);
+    stop,
+  }), [messages, isLoading, loadingHistory, error, clineThreadId, threadId, submit, stop]);
 
   return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>;
 }
