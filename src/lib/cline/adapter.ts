@@ -44,6 +44,7 @@ export interface ClineAdapter {
   /** Subscribe to session events. Returns an unsubscribe function. */
   subscribe(
     listener: (event: CoreSessionEvent) => void,
+    options?: { sessionId?: string },
   ): () => void;
 
   /** Delete a session. */
@@ -125,8 +126,8 @@ export async function createClineAdapter(
       }));
     },
 
-    subscribe(listener) {
-      return core.subscribe(listener);
+    subscribe(listener, options) {
+      return core.subscribe(listener, options);
     },
 
     async deleteSession(sessionId: string) {

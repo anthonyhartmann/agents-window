@@ -76,7 +76,9 @@ export async function POST(request: Request) {
       try {
         const adapter = await getAdapter();
 
-        // Subscribe BEFORE starting so we don't miss early events
+        // Subscribe BEFORE starting so we don't miss early events.
+        // Filter by sessionId when resuming to avoid duplicate events from
+        // accumulated global subscribers.
         unsub = adapter.subscribe((event: CoreSessionEvent) => {
           switch (event.type) {
             case "agent_event":
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
             default:
               break;
           }
-        });
+        }, body.threadId ? { sessionId: body.threadId } : undefined);
 
         let sessionId: string;
         if (body.threadId) {
