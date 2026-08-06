@@ -55,6 +55,8 @@ export interface UIMessage {
   id?: string;
   name?: string;
   status?: "error" | "success";
+  /** Reasoning/thinking content from the model (shown behind toggle). */
+  reasoning?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,8 +99,14 @@ export function humanMessage(content: string, id?: string): UIMessage {
   return { type: "human", content, ...(id && { id }) };
 }
 
-export function aiMessage(content: string, opts?: { id?: string; tool_calls?: UIMessage["tool_calls"] }): UIMessage {
-  return { type: "ai", content, ...(opts?.id && { id: opts.id }), ...(opts?.tool_calls && { tool_calls: opts.tool_calls }) };
+export function aiMessage(content: string, opts?: { id?: string; tool_calls?: UIMessage["tool_calls"]; reasoning?: string }): UIMessage {
+  return {
+    type: "ai",
+    content,
+    ...(opts?.id && { id: opts.id }),
+    ...(opts?.tool_calls && { tool_calls: opts.tool_calls }),
+    ...(opts?.reasoning !== undefined && { reasoning: opts.reasoning }),
+  };
 }
 
 export function toolMessage(toolCallId: string, name: string, content: string, status: "success" | "error" = "success"): UIMessage {

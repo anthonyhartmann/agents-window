@@ -88,7 +88,7 @@ describe("parseEventSourceMessage", () => {
 // processEvent
 // ---------------------------------------------------------------------------
 
-const empty = { messages: [], isLoading: false, error: null, threadId: null };
+const empty = { messages: [], isLoading: false, streamStatus: "idle" as const, error: null, threadId: null };
 
 describe("processEvent", () => {
   it("sets threadId on session event", () => {
@@ -145,13 +145,52 @@ describe("processEvent", () => {
   });
 
   it("sets isLoading false on ended", () => {
-    const r = processEvent({ event: "ended", data: {} }, { ...empty, isLoading: true });
+    const r = processEvent({ event: "ended", data: {} }, { ...empty, isLoading: true, streamStatus: "streaming" as const });
     expect(r.isLoading).toBe(false);
+    expect(r.streamStatus).toBe("idle");
   });
 
   it("sets error on error event", () => {
     const r = processEvent({ event: "error", data: { error: "fail" } }, empty);
     expect(r.error).toBe("fail");
+  });
+
+  it("sets streamStatus to streaming on session event", () => {
+    const r = processEvent({ event: "session", data: { sessionId: "s1" } }, { ...empty, streamStatus: "connecting" });
+    expect(r.streamStatus).toBe("streaming");
+  });
+
+  it("captures reasoning content_start", () => {
+    const r = processEvent(
+      { event: "agent_event", data: { type: "content_start", contentType: "reasoning" } },
+      empty,
+    );
+    expect(r.messages).toHaveLength(1);
+    expect(r.messages[0].reasoning).toBe("");
+  });
+
+  it("accumulates reasoning content_update", () => {
+    let s = processEvent(
+      { event: "agent_event", data: { type: "content_start", contentType: "reasoning" } },
+      empty,
+    );
+    s = processEvent(
+      { event: "agent_event", data: { type: "content_update", contentType: "reasoning", update: "Let me think..." } },
+      s,
+    );
+    expect(s.messages[0].reasoning).toBe("Let me think...");
+  });
+
+  it("finalizes reasoning on content_end", () => {
+    let s = processEvent(
+      { event: "agent_event", data: { type: "content_start", contentType: "reasoning" } },
+      empty,
+    );
+    s = processEvent(
+      { event: "agent_event", data: { type: "content_end", contentType: "reasoning", reasoning: "Final reasoning" } },
+      s,
+    );
+    expect(s.messages[0].reasoning).toBe("Final reasoning");
   });
 });
 

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
 import { useState, FormEvent } from "react";
 import { Button } from "../ui/button";
-import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
+import { AssistantMessage, AssistantMessageLoading, StreamingIndicator } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
 import { LangGraphLogoSVG } from "../icons/langgraph";
 import { TooltipIconButton } from "./tooltip-icon-button";
@@ -116,7 +116,7 @@ export function Thread() {
   const [firstTokenReceived, setFirstTokenReceived] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
 
-  const { messages, isLoading, error, submit, interrupt, stop } = useStreamContext();
+  const { messages, isLoading, streamStatus, error, submit, interrupt, stop } = useStreamContext();
 
   const lastError = useRef<string | undefined>(undefined);
 
@@ -363,8 +363,11 @@ export function Thread() {
                       handleRegenerate={handleRegenerate}
                     />
                   )}
-                  {isLoading && !firstTokenReceived && (
+                  {streamStatus === "connecting" && (
                     <AssistantMessageLoading />
+                  )}
+                  {streamStatus === "streaming" && !firstTokenReceived && (
+                    <StreamingIndicator />
                   )}
                 </>
               }

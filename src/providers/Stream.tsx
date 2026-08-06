@@ -21,6 +21,7 @@ import { ArrowRight } from "lucide-react";
 export interface StreamContextType {
   messages: UIMessage[];
   isLoading: boolean;
+  streamStatus: "idle" | "connecting" | "streaming";
   error: string | null;
   threadId: string | null;
   submit: (message: string | undefined, config?: Record<string, unknown>) => void;
@@ -34,7 +35,7 @@ const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 function StreamSession({ children }: { children: ReactNode }) {
   const [threadId, setThreadId] = useQueryState("threadId");
-  const { threadId: clineThreadId, messages, isLoading, error, sendMessage, loadMessages, clearError, stop } = useClineStream();
+  const { threadId: clineThreadId, messages, isLoading, streamStatus, error, sendMessage, loadMessages, clearError, stop } = useClineStream();
 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const lastLoadedId = useRef<string | null>(null);
@@ -75,11 +76,12 @@ function StreamSession({ children }: { children: ReactNode }) {
   const value: StreamContextType = useMemo(() => ({
     messages,
     isLoading: isLoading || loadingHistory,
+    streamStatus: loadingHistory ? "connecting" : streamStatus,
     error,
     threadId: clineThreadId ?? threadId,
     submit,
     stop,
-  }), [messages, isLoading, loadingHistory, error, clineThreadId, threadId, submit, stop]);
+  }), [messages, isLoading, loadingHistory, streamStatus, error, clineThreadId, threadId, submit, stop]);
 
   return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>;
 }

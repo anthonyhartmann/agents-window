@@ -2,9 +2,12 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { aiMessage, toolMessage, toolCallEntry, type UIMessage } from "@/lib/cline/cline-types";
 
+export type StreamStatus = "idle" | "connecting" | "streaming";
+
 export interface ClineStreamState {
   messages: UIMessage[];
   isLoading: boolean;
+  streamStatus: StreamStatus;
   error: string | null;
   threadId: string | null;
 }
@@ -39,7 +42,7 @@ export function processEvent(
   switch (event.event) {
     case "session": {
       const sessionId = String(event.data.sessionId ?? "");
-      return { ...current, threadId: sessionId || current.threadId };
+      return { ...current, threadId: sessionId || current.threadId, streamStatus: "streaming" };
     }
 
     case "agent_event": {
@@ -49,6 +52,7 @@ export function processEvent(
       const toolCallId = String(e.toolCallId ?? "");
       const toolName = String(e.toolName ?? "");
       const text = String(e.text ?? "");
+      const reasoning = String(e.reasoning ?? "");
       const output = String(e.output ?? "");
       const input = (e.input ?? {}) as Record<string, unknown>;
       const error = String(e.error ?? "");
@@ -57,12 +61,45 @@ export function processEvent(
         messages.push(aiMessage(""));
       }
 
+      if (t === "content_start" && contentType === "reasoning") {
+        // Start a new AI message for reasoning content
+        messages.push(aiMessage("", { reasoning: "" }));
+      }
+
+      if (t === "content_update" && contentType === "reasoning") {
+        const delta = String(e.update ?? "");
+        if (delta) {
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].type === "ai") {
+              const existing = messages[i].reasoning ?? "";
+              messages[i] = aiMessage(messages[i].content as string, {
+                reasoning: existing + delta,
+              });
+              break;
+            }
+          }
+        }
+      }
+
+      if (t === "content_end" && contentType === "reasoning" && reasoning) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].type === "ai") {
+            messages[i] = aiMessage(messages[i].content as string, {
+              reasoning,
+            });
+            break;
+          }
+        }
+      }
+
       if (t === "content_update" && contentType === "text") {
         const delta = String(e.update ?? "");
         if (delta) {
           for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].type === "ai") {
-              messages[i] = aiMessage(delta);
+              messages[i] = aiMessage(delta, {
+                reasoning: messages[i].reasoning,
+              });
               break;
             }
           }
@@ -72,7 +109,9 @@ export function processEvent(
       if (t === "content_end" && contentType === "text" && text) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].type === "ai") {
-            messages[i] = aiMessage(text);
+            messages[i] = aiMessage(text, {
+              reasoning: messages[i].reasoning,
+            });
             break;
           }
         }
@@ -89,18 +128,18 @@ export function processEvent(
       }
 
       if (t === "error") {
-        return { ...current, messages, error: error || "Unknown error", isLoading: false };
+        return { ...current, messages, error: error || "Unknown error", isLoading: false, streamStatus: "idle" };
       }
 
       return { ...current, messages };
     }
 
     case "ended":
-      return { ...current, messages, isLoading: false };
+      return { ...current, messages, isLoading: false, streamStatus: "idle" };
 
     case "error": {
       const errorMsg = String(event.data.error ?? "Stream failed");
-      return { ...current, messages, error: errorMsg, isLoading: false };
+      return { ...current, messages, error: errorMsg, isLoading: false, streamStatus: "idle" };
     }
 
     default:
@@ -110,7 +149,7 @@ export function processEvent(
 
 export function useClineStream(): UseClineStreamReturn {
   const [state, setState] = useState<ClineStreamState>({
-    messages: [], isLoading: false, error: null, threadId: null,
+    messages: [], isLoading: false, streamStatus: "idle", error: null, threadId: null,
   });
   const abortRef = useRef<AbortController | null>(null);
   const stateRef = useRef(state);
@@ -130,6 +169,7 @@ export function useClineStream(): UseClineStreamReturn {
       ...prev,
       messages: [...prev.messages, userMsg],
       isLoading: true,
+      streamStatus: "connecting",
       error: null,
     }));
 
@@ -143,7 +183,7 @@ export function useClineStream(): UseClineStreamReturn {
         });
         if (!res.ok) {
           const errText = await res.text();
-          setState((prev) => ({ ...prev, isLoading: false, error: errText || `HTTP ${res.status}` }));
+          setState((prev) => ({ ...prev, isLoading: false, streamStatus: "idle", error: errText || `HTTP ${res.status}` }));
           return;
         }
         const reader = res.body!.getReader();
@@ -162,14 +202,14 @@ export function useClineStream(): UseClineStreamReturn {
           if (done) break;
           parser.feed(decoder.decode(value, { stream: true }));
         }
-        setState((prev) => ({ ...prev, isLoading: false }));
+        setState((prev) => ({ ...prev, isLoading: false, streamStatus: "idle" }));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          setState((prev) => ({ ...prev, isLoading: false }));
+          setState((prev) => ({ ...prev, isLoading: false, streamStatus: "idle" }));
           return;
         }
         setState((prev) => ({
-          ...prev, isLoading: false,
+          ...prev, isLoading: false, streamStatus: "idle",
           error: err instanceof Error ? err.message : "Stream failed",
         }));
       }
@@ -184,6 +224,7 @@ export function useClineStream(): UseClineStreamReturn {
     setState({
       messages,
       isLoading: false,
+      streamStatus: "idle",
       error: null,
       threadId: tid,
     });

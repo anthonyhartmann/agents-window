@@ -7,6 +7,8 @@ import { ToolCalls, ToolResult } from "./tool-calls";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
 import type { UIMessage } from "@/lib/cline/cline-types";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 function CustomComponent(_props: {
   message: UIMessage;
@@ -131,6 +133,10 @@ export function AssistantMessage({
               </div>
             )}
 
+            {message?.reasoning && (
+              <ReasoningBlock reasoning={message.reasoning} />
+            )}
+
             {!hideToolCalls && (
               <>
                 {(hasToolCalls && toolCallsHaveContents && (
@@ -190,6 +196,40 @@ export function AssistantMessageLoading() {
         <div className="bg-foreground/50 h-1.5 w-1.5 animate-[pulse_1.5s_ease-in-out_0.5s_infinite] rounded-full"></div>
         <div className="bg-foreground/50 h-1.5 w-1.5 animate-[pulse_1.5s_ease-in-out_1s_infinite] rounded-full"></div>
       </div>
+    </div>
+  );
+}
+
+export function StreamingIndicator() {
+  return (
+    <div className="mr-auto flex items-start gap-2">
+      <div className="bg-muted flex h-8 items-center gap-2 rounded-2xl px-4 py-2">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <span className="text-muted-foreground text-sm">Thinking...</span>
+      </div>
+    </div>
+  );
+}
+
+function ReasoningBlock({ reasoning }: { reasoning: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!reasoning) return null;
+
+  return (
+    <div className="border-l-2 border-muted pl-3 py-1">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span>Thinking</span>
+      </button>
+      {isOpen && (
+        <div className="mt-2 text-sm text-muted-foreground italic">
+          <MarkdownText>{reasoning}</MarkdownText>
+        </div>
+      )}
     </div>
   );
 }
