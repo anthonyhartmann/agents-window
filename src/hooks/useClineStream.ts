@@ -69,7 +69,7 @@ export function processEvent(
         // Deduplicate: don't push if last message is already an empty AI placeholder
         const last = messages[messages.length - 1];
         if (!(last?.type === "ai" && last.content === "")) {
-          messages.push(aiMessage(""));
+          messages.push(aiMessage("", { reasoning: "" }));
         }
       }
 
