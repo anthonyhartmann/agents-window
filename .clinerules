@@ -118,3 +118,19 @@ For a typical task, Cline should:
   message. Do not let unhandled exceptions crash the Next.js dev server.
 - **If thread list is empty**: verify the adapter is reading from the correct Cline data path.
 - **If tool calls don't render**: verify the mapper produces `tool_calls` as an array of objects with `id` and `function.name`.
+
+## 11. TEST-DRIVEN DEVELOPMENT (TDD) & META-TESTING (MANDATORY)
+
+- **Adopt TDD Sequences strictly**:
+  1. Write your unit or integration test *first* (e.g., in a `__tests__/` directory).
+  2. Verify the test suite fails specifically due to the missing functionality (`pnpm test`).
+  3. Write the minimal amount of implementation code necessary to pass the test.
+  4. Perform standard formatting (`pnpm format`), typecheck (`pnpm typecheck`), and lint (`pnpm lint`).
+- **Conduct Meta-Testing**:
+  - Always verify that written tests are not "false positives".
+  - After seeing a test pass, temporarily sabotage the source code with a logical error (e.g., flip a boolean, return null, swallow an error).
+  - Re-run the tests and verify that the test suite **fails** precisely as expected.
+  - Revert the sabotage and restore the passing state.
+- **Capture Production Failure Diagnostics**:
+  - For diagnosing production failures, append critical streaming failures and unhandled route rejections to `.agents-window-diagnostics.log`.
+  - When asked to analyze or pinpoint a live user crash/failure, locate and parse `.agents-window-diagnostics.log` first to identify exact timestamps, trace contexts, and errors.
