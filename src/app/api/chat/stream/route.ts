@@ -185,14 +185,16 @@ export async function POST(request: Request) {
           const existing = Array.isArray(allMessages)
             ? allMessages.slice(-50)
             : [];
-          console.log(
-            `[/api/chat/stream] Resume thread ${body.threadId}: loaded ${existing.length} messages (of ${Array.isArray(allMessages) ? allMessages.length : 0})`,
-          );
 
           logger.info("Resuming existing Cline stream thread", {
             threadId: body.threadId,
             category: "SSE_STREAM",
-            metadata: { loadedMessagesCount: existing.length },
+            metadata: {
+              loadedMessagesCount: existing.length,
+              totalMessagesCount: Array.isArray(allMessages)
+                ? allMessages.length
+                : 0,
+            },
           });
 
           const result = await adapter.startSession({
