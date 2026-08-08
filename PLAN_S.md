@@ -1,14 +1,9 @@
 # Implementation Plan: [S] Components (Immediate Needs)
 
 This document outlines a revised, **zero-maintenance / minimal-code**
-implementation plan for the **[S] (Immediate Needs)** tier of the roadmap.
-
-Instead of writing and maintaining a large surface area of custom interceptors,
-custom Error Boundary classes, custom console buffers, and local `/api/debug/*`
-logging endpoints, we **leverage existing, industry-standard, battle-tested
-libraries and out-of-the-box browser tracing capabilities**. This minimizes
-developer cognitive load, keeps the codebase secure, and reduces technical debt
-to practically zero.
+implementation plan for the **[S] (Immediate Needs)** tier of the roadmap,
+complemented by a rigorous **Test-Driven Development (TDD) blueprint**, a **Meta-
+Testing setup**, an **Exhaustive Coverage Map**, and **Permanent Production Diagnostics**.
 
 ---
 
@@ -71,7 +66,8 @@ export function ErrorBoundary({ children }: { children: ReactNode }) {
 }
 ```
 
-*This requires executing `pnpm install react-error-boundary` as a lightweight, single-dependency addition to the codebase.*
+*This requires executing `pnpm install react-error-boundary` as a lightweight,
+single-dependency addition to the codebase.*
 
 ---
 
@@ -88,13 +84,16 @@ Instead, we leverage **Playwright's built-in Tracing API** which is already
 present in `devDependencies` via `@playwright/test`.
 
 Playwright Tracing automatically captures:
-1. **Full Network Logs:** Fetch requests, API request/response payloads, headers, latency, and full chunk streams (like `/api/chat/stream`).
-2. **Console Logs:** `console.log`, `console.error`, and `console.warn` outputs are fully captured and timestamped.
-3. **Screenshots & DOM Snapshots:** A visual step-by-step history of every interaction and rendering change.
+1. **Full Network Logs:** Fetch requests, API request/response payloads,
+   headers, latency, and full chunk streams (like `/api/chat/stream`).
+2. **Console Logs:** `console.log`, `console.error`, and `console.warn` outputs
+   are fully captured and timestamped.
+3. **Screenshots & DOM Snapshots:** A visual step-by-step history of every
+   interaction and rendering change.
 
 ### How to use Playwright Tracing
-Configure your local agent or automation suite to run tests with tracing enabled
-in `playwright.config.ts`:
+Configure your local agent or automation suite to run tests with tracing
+enabled in `playwright.config.ts`:
 
 ```typescript
 import { defineConfig } from "@playwright/test";
@@ -113,11 +112,14 @@ export default defineConfig({
 If the agent runs into a failing assertion or crash:
 1. The agent executes the test (e.g., `pnpm exec playwright test`).
 2. Playwright saves a trace file (e.g., `test-results/my-test/trace.zip`).
-3. The agent can programmatically unzip and read the built-in trace JSON structure (`trace.playwright.json`) or use the built-in trace viewer:
+3. The agent can programmatically unzip and read the built-in trace JSON
+   structure (`trace.playwright.json`) or use the built-in trace viewer:
    ```bash
    pnpm exec playwright show-trace test-results/my-test/trace.zip
    ```
-4. This gives the agent a precise, structured overview of all `fetch` responses, headers, console errors, and DOM screenshots **without writing a single line of custom backend routing code**.
+4. This gives the agent a precise, structured overview of all `fetch`
+   responses, headers, console errors, and DOM screenshots **without writing a
+   single line of custom backend routing code**.
 
 ---
 
@@ -137,7 +139,7 @@ import { chromium } from "@playwright/test";
 const browser = await chromium.launch({
   headless: true,
   args: [
-    "--no-sandbox",                  // Disable Chromium user namespace sandbox in Docker
+    "--no-sandbox",                  // Disable Chromium namespace sandbox in Docker
     "--disable-setuid-sandbox",       // Disable user namespace sandbox for setuid binaries
     "--disable-dev-shm-usage",        // Prevent memory exhaustion crashes by writing to /tmp instead of /dev/shm
     "--disable-gpu",                  // Bypass GPU hardware acceleration driver crashes
@@ -148,15 +150,132 @@ const browser = await chromium.launch({
 
 ---
 
-## 4. Summary of Codebase Impact & Footprint
+## 4. Test Integration & "Meta-Testing" After Every Step
 
-| Category | High-Maintenance Approach | Low-Maintenance Library Approach (Fewer lines of code to maintain!) |
-|----------|---------------------------|-------------------------------------------------------------------|
-| **Error Fallbacks** | Custom Class component + global overrides + custom window logs wrapper. | `react-error-boundary` standard library. |
-| **Error Diagnostics** | Custom `/api/debug/dump-error` route + filesystem writing. | None. Built-in Next.js page layouts + standard Playwright Tracing console captures. |
-| **Network Traffic Logs** | Custom `/api/debug/dump-network` route + hook fetch wrappers + chunk logging buffers. | None. Standard browser network trace capture using native Playwright HAR / `.zip` tracing. |
-| **Sandbox Execution** | Standard Playwright headless settings. | Playwright launcher configured with `--disable-dev-shm-usage` & `--no-sandbox` overrides. |
+To ensure our tests are fully resilient and avoid "false positives" (tests
+that pass even when the system is fundamentally broken), we mandate a strict
+**Meta-Testing** protocol after completing any implementation step.
 
-Using this updated approach, we achieve a **10x reduction in custom code
-scope**, keeping our repository clean, secure, and infinitely easier to maintain
-over time.
+### Meta-Testing Protocol
+For any test suite written for an [S] component:
+1. **Verify Pass:** Run the test suite on clean code and confirm it exits with
+   success (0).
+2. **Inject Controlled Sabotage:** Purposefully introduce a logical error or
+   runtime bug in the implementation code.
+   - *Example for Error Boundary:* Temporarily remove the ErrorBoundary wrap from
+     `layout.tsx` or force it to swallow errors silently.
+   - *Example for Tracing:* Temporarily mock network requests to completely bypass
+     the trace settings or corrupt the output trace directory.
+3. **Verify Expected Failure:** Run the test suite again. The test **must fail**
+   and report the exact failure mode. If the test still passes, the test itself
+   is broken (a false positive) and must be rewritten.
+4. **Revert and Restore:** Undo the sabotage and confirm the test suite passes
+   cleanly once more.
+
+---
+
+## 5. Agent Guidelines for Test-Driven Development (TDD)
+
+When executing development tasks using our setup, AI agents must adhere to the
+following strict TDD sequence:
+
+1. **Write the Test First:** Before touching any source implementation file,
+   create a failing test file (e.g., `src/.../__tests__/my-feature.test.tsx`)
+   covering the required happy path and edge cases.
+2. **Verify Failure:** Run the test runner (e.g., `pnpm test`). Ensure the new test
+   fails specifically due to the missing implementation.
+3. **Write Minimal Source Code:** Implement only the code necessary to make the
+   test pass.
+4. **Refactor & Format:** Clean up code formatting and imports, and run
+   `pnpm format:check` and `pnpm lint`.
+5. **Perform Meta-Testing:** Sabotage the code temporarily to guarantee the test
+   suite is robust, then restore.
+
+---
+
+## 6. Exhaustive Testing & Feature Coverage Map
+
+The current test suite is highly sparse. We aim for full coverage across all
+functionality. Below is the list of missing test coverage and the detailed Unit
+and E2E test cases we plan to implement to achieve exhaustive test assurance.
+
+### A. Missing Test Functionality
+1. **`src/providers/Stream.tsx`**: Currently untested. No coverage for session
+   resume, query-state parameter reading, initial mount state, or message loading.
+2. **`src/hooks/useClineStream.ts`**: Untested. No tests for EventSource SSE
+   parsing, parser delta accumulation, tool-call chunk state mapping, or abort
+   controller cleanup.
+3. **`src/lib/cline/session-reader.ts`**: Lacks rigorous tests for path
+   resolution, fallback to settings directories, manifest schema mismatches, and
+   file listing ordering.
+4. **`src/app/api/chat/stream/route.ts`**: No route integration tests. No
+   coverage for response headers, aborted streaming signals, or socket cleanup.
+5. **Sidebar Selection & Thread Switching**: No end-to-end tests covering sidebar
+   clicks, query state updates, and proper unmount memory leak prevention.
+
+### B. Planned Unit & Integration Tests (Vitest)
+- `src/hooks/__tests__/useClineStream.test.ts`
+  - *Case 1:* Accumulates multiple concurrent text delta chunks correctly.
+  - *Case 2:* Buffers tool call arguments across streaming chunks without loss.
+  - *Case 3:* Emits clean error states and terminates loading status on stream
+    rejection.
+  - *Case 4:* Automatically calls `AbortController.abort()` on component unmount.
+- `src/lib/cline/__tests__/session-reader.test.ts`
+  - *Case 1:* Resolves the provider default settings cleanly when a recent
+    session is present.
+  - *Case 2:* Safely falls back to `providers.json` when sessions directories do
+    not exist.
+  - *Case 3:* Gracefully handles malformed manifest JSON files without throwing
+    fatal errors.
+
+### C. Planned End-to-End Tests (Playwright)
+- `tests/chat-e2e.spec.ts`
+  - *Case 1:* Opening `/` loads the history list and correctly highlights the
+    active thread parameter from the URL.
+  - *Case 2:* Submitting a prompt initiates the SSE request and updates the main
+    chat bubble list dynamically as chunks arrive.
+  - *Case 3:* A component error triggers the standard `ErrorBoundary` rendering
+    fallback, presenting a clear reload button and avoiding standard browser
+    lockups.
+  - *Case 4:* Uploading a file serializes the attachment to Base64 and appends
+    it to the outbound stream API body.
+
+---
+
+## 7. Permanent Production Diagnostics Logging
+
+While Playwright Tracing is exceptional for debugging local integration tests, it
+does not run in live user production environments. To enable an AI agent to
+reliably inspect and diagnose failures in real-world production runs, we plan
+to introduce a **Permanent Diagnostics Log System**.
+
+### Diagnostics Logging Architecture
+We will implement a lightweight, zero-dependency rotating file log system on the
+server.
+
+1. **The Log Store**: All key session and streaming events, network failures,
+   Next.js API route errors, and critical client boundary crashes are logged
+   into a local rotating JSON log file located at `.agents-window-diagnostics.log`.
+2. **Log Entry Schema**:
+   ```json
+   {
+     "timestamp": "2026-08-01T14:21:01.814Z",
+     "level": "ERROR" | "INFO" | "WARN",
+     "threadId": "1785255661814_gtekl",
+     "category": "API_ROUTE" | "SSE_STREAM" | "CLIENT_UI" | "CLINE_SDK",
+     "message": "Failed to serialize streaming chunk",
+     "metadata": {
+       "statusCode": 500,
+       "errorDetails": "...",
+       "url": "/api/chat/stream"
+     }
+   }
+   ```
+3. **Rotating Log Buffer**: To prevent disk bloat, we implement a lightweight
+   log rotator helper. When `.agents-window-diagnostics.log` exceeds 5MB, it
+   rotates to `.agents-window-diagnostics.log.1` (keeping a maximum of 3 old files).
+4. **Agent Pinpoint Access**: We document this diagnostic architecture inside the
+   agent guidelines. When a user tells the agent: *"My session failed yesterday,
+   tell me why"*, the agent is instructed to read `.agents-window-diagnostics.log`,
+   filter for matches on yesterday's date, isolate the `ERROR` logs, and pin-point
+   the precise backend trace or client-side crash payload.
