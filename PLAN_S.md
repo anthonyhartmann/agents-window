@@ -136,7 +136,7 @@ If the agent runs into a failing assertion or crash:
 
 ---
 
-## 3. Stabilization of Headless Sandbox & Chrome Browser Crashes
+## 3. Stabilization of Headless Sandbox & Chrome Browser Crashes (COMPLETED)
 
 To prevent Chrome browser crashes in restricted, headless environments (such as
 Docker, Cline virtualized sandboxes, or remote execution layers), we override
