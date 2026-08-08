@@ -242,40 +242,75 @@ and E2E test cases we plan to implement to achieve exhaustive test assurance.
 
 ---
 
-## 7. Permanent Production Diagnostics Logging
+## 7. Permanent Production Diagnostics Logging via Winston
 
-While Playwright Tracing is exceptional for debugging local integration tests, it
-does not run in live user production environments. To enable an AI agent to
-reliably inspect and diagnose failures in real-world production runs, we plan
-to introduce a **Permanent Diagnostics Log System**.
+To guarantee high reliability and avoid the security risks and runtime bugs
+associated with custom rolling file-writer logic, we leverage **Winston** (the
+industry-standard Node.js logger) combined with its robust size-based rotation.
 
-### Diagnostics Logging Architecture
-We will implement a lightweight, zero-dependency rotating file log system on the
-server.
+### A. Package Installation
+Execute standard, production-tested package commands:
+```bash
+pnpm install winston winston-daily-rotate-file
+```
 
-1. **The Log Store**: All key session and streaming events, network failures,
-   Next.js API route errors, and critical client boundary crashes are logged
-   into a local rotating JSON log file located at `.agents-window-diagnostics.log`.
-2. **Log Entry Schema**:
-   ```json
-   {
-     "timestamp": "2026-08-01T14:21:01.814Z",
-     "level": "ERROR" | "INFO" | "WARN",
-     "threadId": "1785255661814_gtekl",
-     "category": "API_ROUTE" | "SSE_STREAM" | "CLIENT_UI" | "CLINE_SDK",
-     "message": "Failed to serialize streaming chunk",
-     "metadata": {
-       "statusCode": 500,
-       "errorDetails": "...",
-       "url": "/api/chat/stream"
-     }
-   }
-   ```
-3. **Rotating Log Buffer**: To prevent disk bloat, we implement a lightweight
-   log rotator helper. When `.agents-window-diagnostics.log` exceeds 5MB, it
-   rotates to `.agents-window-diagnostics.log.1` (keeping a maximum of 3 old files).
-4. **Agent Pinpoint Access**: We document this diagnostic architecture inside the
-   agent guidelines. When a user tells the agent: *"My session failed yesterday,
-   tell me why"*, the agent is instructed to read `.agents-window-diagnostics.log`,
-   filter for matches on yesterday's date, isolate the `ERROR` logs, and pin-point
-   the precise backend trace or client-side crash payload.
+### B. Logger Configuration
+We create a highly reliable, unified logger instance at `src/lib/logger.ts`:
+
+```typescript
+import winston from "winston";
+import "winston-daily-rotate-file";
+import path from "path";
+
+const logFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.json()
+);
+
+export const logger = winston.createLogger({
+  level: "info",
+  format: logFormat,
+  transports: [
+    // Production diagnostics rotate transport configuration
+    new winston.transports.DailyRotateFile({
+      filename: path.join(process.cwd(), ".agents-window-diagnostics-%DATE%.log"),
+      datePattern: "YYYY-MM-DD",
+      maxSize: "5m",       // Maximum log file size before rotating
+      maxFiles: "3",       // Retain a maximum of 3 rotated backup log files
+      zippedArchive: true, // Compress older backup logs
+    })
+  ]
+});
+```
+
+### C. Diagnostics Schema & Logging Logic
+Every logged event conforms strictly to a structured JSON schema:
+
+```typescript
+interface LogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  threadId: string | null;
+  category: "API_ROUTE" | "SSE_STREAM" | "CLIENT_UI" | "CLINE_SDK";
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+```
+
+Usage inside Next.js API Routes and SSE stream handlers:
+```typescript
+import { logger } from "@/lib/logger";
+
+logger.error("SSE stream serialization failed", {
+  threadId: "1785255661814_gtekl",
+  category: "SSE_STREAM",
+  metadata: { statusCode: 500, error: err.message }
+});
+```
+
+### D. Agent Pinpoint Diagnostics Guidelines
+AI developer agents looking to pinpoint real fails in production must:
+1. Locate the rotated diagnostics logs (matching `.agents-window-diagnostics-*.log`).
+2. Search and parse the JSON line objects.
+3. Filter by the specific thread ID, category, or level `error`.
+4. Pinpoint the exact root cause from the parsed JSON metadata fields.
