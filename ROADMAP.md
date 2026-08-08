@@ -1,8 +1,13 @@
 # Agent Chat UI (agents-window) — Master Development Roadmap
 
-This document outlines a concrete, actionable roadmap for the `agents-window` repository, tailored for **cheap/free AI model development** and **efficient agentic workflows**.
+This document outlines a concrete, actionable roadmap for the `agents-window`
+repository, tailored for **cheap/free AI model development** and **efficient
+agentic workflows**.
 
-The goal of this roadmap is to establish a fast, reliable, and low-cost development environment first, and then incrementally introduce features that make cheap models perform like expensive ones (e.g., through context compacting, planner-worker delegation, and robust error/debugging loops).
+The goal of this roadmap is to establish a fast, reliable, and low-cost
+development environment first, and then incrementally introduce features that
+make cheap models perform like expensive ones (e.g., through context compacting,
+planner-worker delegation, and robust error/debugging loops).
 
 ---
 
@@ -22,7 +27,9 @@ The goal of this roadmap is to establish a fast, reliable, and low-cost developm
 
 ## [S] Immediate Needs: Better Testing & Agentic Debugging Loop
 
-When using cheap or free models, agents are prone to hallucinating React errors or failing to comprehend network failures. The priority is to build a development loop where the agent **always knows exactly what is going wrong**.
+When using cheap or free models, agents are prone to hallucinating React errors
+or failing to comprehend network failures. The priority is to build a
+development loop where the agent **always knows exactly what is going wrong**.
 
 ### 1. Unified Client-Side Debug Interceptor & Error Boundary
 * **Problem:** The agent cannot see client-side React rendering crashes or inspect browser console logs.
@@ -61,7 +68,9 @@ When using cheap or free models, agents are prone to hallucinating React errors 
 
 ## [A] Soon: Provider Abstraction & Model Quality
 
-Currently, the application relies heavily on `@cline/sdk`. To unlock cheaper models and more reliable connections, we must decouple the core UI from Cline and make direct provider integration simple.
+Currently, the application relies heavily on `@cline/sdk`. To unlock cheaper
+models and more reliable connections, we must decouple the core UI from Cline
+and make direct provider integration simple.
 
 ```
        +--------------------------------------------+
@@ -112,7 +121,8 @@ Currently, the application relies heavily on `@cline/sdk`. To unlock cheaper mod
 
 ## [B] Nice-to-Have: General Reliability & Developer QoL
 
-These features are aimed at maximizing development efficiency, enabling local workspace editing, and minimizing context window bloat.
+These features are aimed at maximizing development efficiency, enabling local
+workspace editing, and minimizing context window bloat.
 
 ### 1. Connection Reliability & Dual-Wielding (TUI + Window)
 * **Problem:** If the web UI crashes or disconnects, active agent processes are lost. Alternatively, running Cline CLI/VS Code and the Web UI simultaneously can lead to lockups.
@@ -156,7 +166,9 @@ These features are aimed at maximizing development efficiency, enabling local wo
 
 ## [C] Productionizing & Cost Control
 
-Once the application is robust for local usage, these improvements focus on making the app ready for deployment and keeping cloud hosting/usage costs to a absolute minimum.
+Once the application is robust for local usage, these improvements focus on
+making the app ready for deployment and keeping cloud hosting/usage costs to a
+absolute minimum.
 
 ### 1. Removing Deprecated LangGraph Code
 * **Problem:** Unused LangChain packages bloat bundle sizes and build times.
