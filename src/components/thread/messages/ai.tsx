@@ -107,6 +107,7 @@ export function AssistantMessage({
     );
   const hasAnthropicToolCalls = !!anthropicStreamedToolCalls?.length;
   const isToolResult = message?.type === "tool";
+  const contentString = message && !isToolResult && content ? (typeof content === "string" ? content : (Array.isArray(content) ? content.filter(c => c.type === "text").map(c => c.text).join("") : "")) : "";
 
   if (isToolResult && hideToolCalls) {
     return null;

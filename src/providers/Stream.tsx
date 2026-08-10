@@ -41,12 +41,16 @@ function StreamSession({ children }: { children: ReactNode }) {
   const lastLoadedId = useRef<string | null>(null);
 
   // Seed threadId from the URL on mount in case nuqs hasn't hydrated yet
-  const initialThreadIdRef = useRef<string | null>(null);
-  if (typeof window !== "undefined" && initialThreadIdRef.current === null) {
-    const params = new URLSearchParams(window.location.search);
-    initialThreadIdRef.current = params.get("threadId");
-  }
-  const resolvedThreadId = threadId ?? initialThreadIdRef.current;
+  const [initialThreadId, setInitialThreadId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined" && initialThreadId === null) {
+      const params = new URLSearchParams(window.location.search);
+      const tid = params.get("threadId");
+      if (tid) setInitialThreadId(tid);
+    }
+  }, [initialThreadId]);
+
+  const resolvedThreadId = threadId ?? initialThreadId;
 
   // Fetch message history when threadId changes (sidebar click or direct URL)
   useEffect(() => {
@@ -54,8 +58,8 @@ function StreamSession({ children }: { children: ReactNode }) {
     if (resolvedThreadId === lastLoadedId.current) return;
 
     // Sync nuqs state if it hasn't picked up the URL param yet
-    if (!threadId && initialThreadIdRef.current) {
-      setThreadId(initialThreadIdRef.current);
+    if (!threadId && initialThreadId) {
+      setThreadId(initialThreadId);
     }
 
     // Clear messages immediately so old thread's messages don't flash
