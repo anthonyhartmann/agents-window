@@ -5,6 +5,14 @@ vi.mock("@/lib/cline/session-reader", () => ({
   readSessionFromDisk: vi.fn(),
 }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 import { readSessionFromDisk } from "@/lib/cline/session-reader";
 
 const mockRead = vi.mocked(readSessionFromDisk);

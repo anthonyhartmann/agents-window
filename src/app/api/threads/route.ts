@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listThreadsFromDisk } from "@/lib/cline/session-reader";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/threads
@@ -15,7 +16,10 @@ export async function GET() {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to list threads";
-    console.error("[/api/threads] Error:", message);
+    logger.error("Failed to list threads", {
+      category: "API_ROUTE",
+      metadata: { error: message },
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

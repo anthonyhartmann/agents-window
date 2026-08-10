@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readSessionFromDisk } from "@/lib/cline/session-reader";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/threads/[id]
@@ -27,7 +28,10 @@ export async function GET(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to read session";
-    console.error("[/api/threads/[id]] Error:", message);
+    logger.error("Failed to read session", {
+      category: "API_ROUTE",
+      metadata: { error: message, sessionId: id },
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

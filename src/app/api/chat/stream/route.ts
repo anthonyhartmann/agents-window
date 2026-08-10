@@ -220,8 +220,6 @@ export async function POST(request: Request) {
 
         send("session", { sessionId });
       } catch (error) {
-        console.error("[/api/chat/stream] Error:", error);
-
         logger.error("SSE stream failed inside readable stream", {
           threadId: body.threadId || null,
           category: "SSE_STREAM",

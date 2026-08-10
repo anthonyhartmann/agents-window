@@ -123,17 +123,19 @@ describe("StreamProvider - integration", () => {
   // Submit behaviour
   // -----------------------------------------------------------------------
 
-  it("submit forwards message + threadId to sendMessage", () => {
+  it("submit forwards message + threadId to sendMessage", async () => {
     urlThreadId = "t1";
     mockFetch.mockResolvedValue(threadResponse([]));
 
     const { result } = renderHook(() => useStreamContext(), { wrapper });
 
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+
     act(() => result.current.submit("hello"));
     expect(mockSendMessage).toHaveBeenCalledWith("hello", "t1");
   });
 
-  it("submit uses undefined threadId when URL is empty", () => {
+  it("submit uses undefined threadId when URL is empty", async () => {
     const { result } = renderHook(() => useStreamContext(), { wrapper });
 
     act(() => result.current.submit("hello"));
@@ -204,14 +206,15 @@ describe("StreamProvider - integration", () => {
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
 
-    rerender();
-    rerender();
-    rerender();
+    act(() => { rerender(); });
+    act(() => { rerender(); });
+    act(() => { rerender(); });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("retries fetch after an error when remounted (lastLoadedId is per-instance)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     urlThreadId = "thread-Y";
     mockFetch.mockRejectedValueOnce(new Error("network fail"));
 
@@ -228,6 +231,7 @@ describe("StreamProvider - integration", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/threads/thread-Y");
     });
+    spy.mockRestore();
   });
 
   // -----------------------------------------------------------------------
@@ -261,7 +265,7 @@ describe("StreamProvider - integration", () => {
 
     // This is the operation that can trigger "Maximum update depth exceeded"
     expect(() => {
-      rerender();
+      act(() => { rerender(); });
     }).not.toThrow();
 
     await waitFor(() => {
@@ -344,9 +348,9 @@ describe("StreamProvider - integration", () => {
       ),
     });
 
-    rerender();
-    rerender();
-    rerender();
+    act(() => { rerender(); });
+    act(() => { rerender(); });
+    act(() => { rerender(); });
 
     expect(refs.length).toBeGreaterThanOrEqual(2);
     // Last two renders should produce the same context reference
@@ -373,10 +377,10 @@ describe("StreamProvider - integration", () => {
 
     const afterInitial = refs[refs.length - 1];
 
-    rerender();
+    act(() => { rerender(); });
     expect(refs[refs.length - 1]).toBe(afterInitial);
 
-    rerender();
+    act(() => { rerender(); });
     expect(refs[refs.length - 1]).toBe(afterInitial);
   });
 
@@ -397,8 +401,11 @@ describe("StreamProvider - integration", () => {
   it("does not overwrite URL when clineThreadId matches", async () => {
     urlThreadId = "same-id";
     state.threadId = "same-id";
+    mockFetch.mockResolvedValue(threadResponse([]));
 
     renderHook(() => useStreamContext(), { wrapper });
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
     expect(mockSetThreadId).not.toHaveBeenCalled();
   });
@@ -408,6 +415,7 @@ describe("StreamProvider - integration", () => {
   // -----------------------------------------------------------------------
 
   it("survives a fetch failure and loads successfully on remount", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     urlThreadId = "err-thread";
     mockFetch.mockRejectedValueOnce(new Error("boom"));
 
@@ -426,6 +434,7 @@ describe("StreamProvider - integration", () => {
         "err-thread",
       );
     });
+    spy.mockRestore();
   });
 
   it("handles non-ok HTTP response gracefully", async () => {
@@ -494,11 +503,14 @@ describe("StreamProvider - integration", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("submit passes threadId from URL even when clineThreadId is null", () => {
+  it("submit passes threadId from URL even when clineThreadId is null", async () => {
     urlThreadId = "url-thread";
     state.threadId = null;
+    mockFetch.mockResolvedValue(threadResponse([]));
 
     const { result } = renderHook(() => useStreamContext(), { wrapper });
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
     act(() => result.current.submit("msg"));
     expect(mockSendMessage).toHaveBeenCalledWith("msg", "url-thread");
@@ -530,7 +542,7 @@ describe("StreamProvider - integration", () => {
       threadResponse([{ type: "human", content: "B-msg" }]),
     );
 
-    rerender();
+    act(() => { rerender(); });
 
     await waitFor(() => {
       expect(mockLoadMessages).toHaveBeenCalledWith(

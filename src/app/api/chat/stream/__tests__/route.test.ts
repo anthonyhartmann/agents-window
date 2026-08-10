@@ -17,6 +17,14 @@ vi.mock("@/lib/cline/adapter", () => ({
   }),
 }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 import { POST } from "../route";
 
 beforeEach(() => {
