@@ -52,8 +52,8 @@ function mapSingleMessage(msg: MessageWithMetadata): UIMessage[] {
   const results: UIMessage[] = [];
 
   // Accumulate tool use / tool result pairs
-  const toolUseBlocks = blocks.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
-  const toolResultBlocks = blocks.filter((b): b is Extract<ContentBlock, { type: "tool_result" }> => b.type === "tool_result");
+  const toolUseBlocks = blocks.filter((b) => b.type === "tool_use");
+  const toolResultBlocks = blocks.filter((b) => b.type === "tool_result");
 
   // Extract text content
   const textParts: string[] = [];
@@ -62,10 +62,10 @@ function mapSingleMessage(msg: MessageWithMetadata): UIMessage[] {
   for (const block of blocks) {
     switch (block.type) {
       case "text":
-        textParts.push(block.text);
+        if (block.text) textParts.push(block.text);
         break;
       case "thinking":
-        thinkingParts.push(block.thinking);
+        if (block.thinking) thinkingParts.push(block.thinking);
         break;
       // Images, files → ignored for now (Phase 1)
       case "image":
@@ -99,8 +99,8 @@ function mapSingleMessage(msg: MessageWithMetadata): UIMessage[] {
         id: msg.id,
         ...(toolUseBlocks.length > 0 && {
           tool_calls: toolUseBlocks.map((b) => ({
-            name: b.name,
-            args: b.input,
+            name: b.name ?? "unknown",
+            args: b.input ?? {},
             id: b.id,
             type: "tool_call" as const,
           })),
@@ -119,8 +119,8 @@ function mapSingleMessage(msg: MessageWithMetadata): UIMessage[] {
     results.push({
       type: "tool",
       content,
-      tool_call_id: tr.tool_use_id,
-      name: tr.name,
+      tool_call_id: tr.tool_use_id ?? "",
+      name: tr.name ?? "unknown",
       status: tr.is_error ? "error" : "success",
     });
   }
@@ -132,8 +132,8 @@ function mapSingleMessage(msg: MessageWithMetadata): UIMessage[] {
       content: "",
       id: msg.id,
       tool_calls: toolUseBlocks.map((b) => ({
-        name: b.name,
-        args: b.input,
+        name: b.name ?? "unknown",
+        args: b.input ?? {},
         id: b.id,
         type: "tool_call" as const,
       })),

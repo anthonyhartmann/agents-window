@@ -116,7 +116,7 @@ export async function createClineAdapter(
         ...(options?.limit && { limit: options.limit }),
       });
 
-      return records.map((record) => ({
+      return records.map((record: any) => ({
         id: record.sessionId,
         title: record.metadata?.title ?? "Untitled",
         createdAt: record.startedAt,

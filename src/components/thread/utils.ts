@@ -7,7 +7,9 @@ import type { UIMessage } from "@/lib/cline/cline-types";
  * - If unknown, returns 'Multimodal message'.
  */
 export function getContentString(content: UIMessage["content"]): string {
+  if (!content) return "";
   if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
   const texts = content
     .filter((c): c is { type: "text"; text: string } => c.type === "text")
     .map((c) => c.text);
