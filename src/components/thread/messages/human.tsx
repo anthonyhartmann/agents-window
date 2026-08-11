@@ -4,8 +4,6 @@ import { getContentString } from "../utils";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { CommandBar } from "./shared";
-import { MultimodalPreview } from "@/components/thread/MultimodalPreview";
-import { isBase64ContentBlock } from "@/lib/multimodal-utils";
 import type { UIMessage } from "@/lib/cline/cline-types";
 
 function EditableContent({
@@ -68,26 +66,6 @@ export function HumanMessage({
           />
         ) : (
           <div className="flex flex-col gap-2">
-            {/* Render images and files if no text */}
-            {Array.isArray(message.content) && message.content.length > 0 && (
-              <div className="flex flex-wrap items-end justify-end gap-2">
-                {message.content.reduce<React.ReactNode[]>(
-                  (acc, block, idx) => {
-                    if (isBase64ContentBlock(block)) {
-                      acc.push(
-                        <MultimodalPreview
-                          key={idx}
-                          block={block}
-                          size="md"
-                        />,
-                      );
-                    }
-                    return acc;
-                  },
-                  [],
-                )}
-              </div>
-            )}
             {/* Render text if present, otherwise fallback to file/image name */}
             {contentString ? (
               <p className="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right whitespace-pre-wrap">
