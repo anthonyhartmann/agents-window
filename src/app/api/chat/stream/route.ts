@@ -71,7 +71,7 @@ function serializeAgentEvent(
 }
 
 export async function POST(request: Request) {
-  let body: { message?: string; threadId?: string };
+  let body: { message?: string; threadId?: string; providerId?: string | null; modelId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -202,6 +202,8 @@ export async function POST(request: Request) {
             source: "web",
             threadId: body.threadId,
             initialMessages: existing,
+            ...(body.providerId && { providerId: body.providerId }),
+            ...(body.modelId && { modelId: body.modelId }),
           });
           sessionId = result.sessionId;
         } else {
@@ -214,6 +216,8 @@ export async function POST(request: Request) {
           const result = await adapter.startSession({
             prompt: body.message,
             source: "web",
+            ...(body.providerId && { providerId: body.providerId }),
+            ...(body.modelId && { modelId: body.modelId }),
           });
           sessionId = result.sessionId;
         }
