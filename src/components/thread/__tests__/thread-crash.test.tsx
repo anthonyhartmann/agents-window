@@ -23,6 +23,10 @@ vi.mock("@/providers/Stream", () => ({
     get error() { return null; },
     get threadId() { return currentThreadId; },
     submit: vi.fn(),
+    providerId: "cline-billing",
+    setProviderId: vi.fn(),
+    modelId: "gpt-4o",
+    setModelId: vi.fn(),
   }),
   StreamProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

@@ -13,7 +13,7 @@ export interface ClineStreamState {
 }
 
 export interface UseClineStreamReturn extends ClineStreamState {
-  sendMessage: (text: string, threadId?: string) => void;
+  sendMessage: (text: string, threadId?: string, providerId?: string | null, modelId?: string | null) => void;
   clearError: () => void;
   loadMessages: (messages: UIMessage[], threadId: string) => void;
   stop: () => void;
@@ -191,7 +191,7 @@ export function useClineStream(): UseClineStreamReturn {
     return () => { abortRef.current?.abort(); };
   }, []);
 
-  const sendMessage = useCallback((text: string, threadId?: string) => {
+  const sendMessage = useCallback((text: string, threadId?: string, providerId?: string | null, modelId?: string | null) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -210,7 +210,7 @@ export function useClineStream(): UseClineStreamReturn {
         const res = await fetch("/api/chat/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, threadId: activeThreadId }),
+          body: JSON.stringify({ message: text, threadId: activeThreadId, providerId, modelId }),
           signal: controller.signal,
         });
         if (!res.ok) {

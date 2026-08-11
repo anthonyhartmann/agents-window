@@ -29,6 +29,10 @@ export interface StreamContextType {
   values?: Record<string, unknown>;
   interrupt?: unknown;
   setBranch?: (branch: string) => void;
+  providerId: string | null;
+  setProviderId: (id: string | null) => void;
+  modelId: string | null;
+  setModelId: (id: string | null) => void;
 }
 
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
@@ -36,6 +40,9 @@ const StreamContext = createContext<StreamContextType | undefined>(undefined);
 function StreamSession({ children }: { children: ReactNode }) {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { threadId: clineThreadId, messages, isLoading, streamStatus, error, sendMessage, loadMessages, clearError, stop } = useClineStream();
+
+  const [providerId, setProviderId] = useState<string | null>(null);
+  const [modelId, setModelId] = useState<string | null>(null);
 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const lastLoadedId = useRef<string | null>(null);
@@ -85,9 +92,9 @@ function StreamSession({ children }: { children: ReactNode }) {
   const submit = useCallback(
     (message: string | undefined, _config?: Record<string, unknown>) => {
       if (!message) return;
-      sendMessage(message, resolvedThreadId ?? undefined);
+      sendMessage(message, resolvedThreadId ?? undefined, providerId, modelId);
     },
-    [sendMessage, resolvedThreadId],
+    [sendMessage, resolvedThreadId, providerId, modelId],
   );
 
   const value: StreamContextType = useMemo(() => ({
@@ -98,7 +105,11 @@ function StreamSession({ children }: { children: ReactNode }) {
     threadId: clineThreadId ?? resolvedThreadId,
     submit,
     stop,
-  }), [messages, isLoading, loadingHistory, streamStatus, error, clineThreadId, resolvedThreadId, submit, stop]);
+    providerId,
+    setProviderId,
+    modelId,
+    setModelId,
+  }), [messages, isLoading, loadingHistory, streamStatus, error, clineThreadId, resolvedThreadId, submit, stop, providerId, modelId]);
 
   return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>;
 }

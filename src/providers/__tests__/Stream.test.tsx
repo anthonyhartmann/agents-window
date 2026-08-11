@@ -132,14 +132,14 @@ describe("StreamProvider - integration", () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
     act(() => result.current.submit("hello"));
-    expect(mockSendMessage).toHaveBeenCalledWith("hello", "t1");
+    expect(mockSendMessage).toHaveBeenCalledWith("hello", "t1", null, null);
   });
 
   it("submit uses undefined threadId when URL is empty", async () => {
     const { result } = renderHook(() => useStreamContext(), { wrapper });
 
     act(() => result.current.submit("hello"));
-    expect(mockSendMessage).toHaveBeenCalledWith("hello", undefined);
+    expect(mockSendMessage).toHaveBeenCalledWith("hello", undefined, null, null);
   });
 
   it("submit ignores undefined / empty messages", () => {
@@ -513,7 +513,7 @@ describe("StreamProvider - integration", () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
     act(() => result.current.submit("msg"));
-    expect(mockSendMessage).toHaveBeenCalledWith("msg", "url-thread");
+    expect(mockSendMessage).toHaveBeenCalledWith("msg", "url-thread", null, null);
   });
 
   // -----------------------------------------------------------------------
@@ -553,7 +553,7 @@ describe("StreamProvider - integration", () => {
 
     // --- Send a message in thread B ---
     act(() => result.current.submit("new message in B"));
-    expect(mockSendMessage).toHaveBeenCalledWith("new message in B", "thread-B");
+    expect(mockSendMessage).toHaveBeenCalledWith("new message in B", "thread-B", null, null);
   });
 
   it("multiple sequential switches settle correctly", async () => {

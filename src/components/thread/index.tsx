@@ -31,6 +31,7 @@ import {
   useArtifactContext,
 } from "./artifact";
 import type { UIMessage } from "@/lib/cline/cline-types";
+import { ModelSelector } from "./model-selector";
 
 const DO_NOT_RENDER_ID_PREFIX = "DO_NOT_RENDER_";
 
@@ -127,7 +128,7 @@ export function Thread() {
       return;
     }
     try {
-      const message = (error as any).message;
+      const message = typeof error === 'string' ? error : (error as any).message || String(error);
       if (!message || lastError.current === message) {
         // Message has already been logged. do not modify ref, return early.
         return;
@@ -297,6 +298,7 @@ export function Thread() {
               </div>
 
               <div className="flex items-center gap-2">
+                <ModelSelector />
                 <button
                   onClick={() => setShowThinking((p) => !p)}
                   className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
